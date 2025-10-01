@@ -10,7 +10,7 @@ msgstr "设置"
 msgid "Thermal File"
 msgstr "温度虚拟文件"
 
-msgid "Fan Speed File"
+msgid "Fan File"
 msgstr "风扇速度虚拟文件"
 
 msgid "Initial Speed"
