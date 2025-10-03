@@ -60,7 +60,7 @@ return view.extend({
                 var temp_span = document.getElementById('fan_temp_status');
                 if (temp_span && temp_str) {
                     var temp = parseInt(temp_str);
-                    var temp_div = uci.get('fancontrol', 'settings', 'temp_div') || 1000; // 提供默认值
+                    var temp_div = uci.get('fancontrol', 'settings', 'temp_div') || 1000; 
                     if (!isNaN(temp)) {
                         temp_span.innerHTML = '<b>' + (temp / temp_div).toFixed(2) + '°C</b>';
                     } else {
