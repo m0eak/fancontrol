@@ -1,38 +1,56 @@
-msgid "Fan General Control"
-msgstr "风扇通用控制小程序"
+msgid "Fan Control Settings"
+msgstr "风扇控制设置"
 
-msgid "Enabled"
-msgstr "是否开启"
+msgid "Configure the parameters for the fan control service."
+msgstr "配置风扇控制服务的相关参数。"
 
-msgid "Settings"
-msgstr "设置"
+msgid "General"
+msgstr "常规"
 
-msgid "Thermal File"
-msgstr "温度虚拟文件"
+msgid "Enable Service"
+msgstr "启用服务"
 
-msgid "Fan File"
-msgstr "风扇速度虚拟文件"
+msgid "Thermal File Path"
+msgstr "温度文件路径"
+
+msgid "Fan Control File Path"
+msgstr "风扇控制文件路径"
 
 msgid "Initial Speed"
 msgstr "启动初始速度"
 
-msgid "Please enter the initial speed for fan startup."
-msgstr "请输入风扇启动的初始速度。"
-
 msgid "Max Speed"
 msgstr "最大速度"
 
-msgid "Please enter maximum fan speed."
-msgstr "请输入风扇最大速度"
+msgid "Start Temperature (°C)"
+msgstr "启动温度 (°C)"
 
-msgid "Start Temperature"
-msgstr "启动温度"
+msgid "Live Status"
+msgstr "实时状态"
 
-msgid "Please enter the fan start temperature."
-msgstr "请输入风扇启动温度。"
+msgid "Service Status"
+msgstr "服务状态"
 
-msgid "Current speed:"
-msgstr "当前速度："
+msgid "CPU Temperature"
+msgstr "CPU 温度"
 
-msgid "Current temperature:"
-msgstr "当前温度："
+msgid "Fan Speed Level"
+msgstr "风扇转速等级"
+
+msgid "Loading..."
+msgstr "正在加载..."
+
+msgid "Running"
+msgstr "运行中"
+
+msgid "Stopped"
+msgstr "已停止"
+
+msgid "Invalid"
+msgstr "无效"
+
+msgid "N/A"
+msgstr "不可用"
+
+msgid "Fan General Control"
+msgstr "通用风扇控制"
