@@ -53,4 +53,4 @@ msgid "N/A"
 msgstr "不可用"
 
 msgid "Fan General Control"
-msgstr "通用风扇控制"
+msgstr "通用风扇控制小程序"
