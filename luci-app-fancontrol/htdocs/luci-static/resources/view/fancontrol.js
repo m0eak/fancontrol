@@ -13,7 +13,7 @@ var callReadFile = rpc.declare({
     expect: { data: '' }
 });
 
-// 自定义样式
+// 自定义样式（无需改动）
 var css = `
 /* 整体两栏布局 */
 .fan-control-container {
@@ -21,8 +21,8 @@ var css = `
     flex-wrap: wrap;
     gap: 20px;
 }
-.fan-form-container { flex: 2; min-width: 320px; }
-.fan-status-container { flex: 1; min-width: 260px; }
+.fan-status-container { flex: 1; min-width: 260px; } /* 监控面板占1份 */
+.fan-form-container { flex: 2; min-width: 320px; }   /* 设置表单占2份 */
 
 /* 去掉LuCI默认灰底与边框 */
 .fan-form-container .cbi-map {
@@ -32,7 +32,7 @@ var css = `
     padding: 0 !important;
 }
 
-/* 选项卡样式（仅展示 General，不新增文案） */
+/* 选项卡样式 */
 .fc-tabs {
     display: flex;
     gap: 8px;
@@ -67,7 +67,7 @@ var css = `
     box-shadow: 0 1px 2px rgba(0,0,0,.04);
 }
 
-/* 表单项两列栅格：左标签右输入 */
+/* 表单项两列栅格 */
 .fan-form-container .cbi-section .cbi-value {
     display: grid;
     grid-template-columns: 220px 1fr;
@@ -152,17 +152,14 @@ return view.extend({
     render: function (data) {
         var m, s;
 
-        // 注入样式
         var style_tag = E('style', { id: 'fancontrol-style', type: 'text/css' }, css);
         dom.append(document.head, style_tag);
-
-        // 整体容器：左表单 + 右状态
+        
         var container = E('div', { 'class': 'fan-control-container' }, [
-            E('div', { 'class': 'fan-form-container' }),
-            E('div', { 'class': 'fan-status-container' })
+            E('div', { 'class': 'fan-status-container' }), // 监控面板
+            E('div', { 'class': 'fan-form-container' })      // 设置表单
         ]);
 
-        // 右侧实时状态面板（不改文案）
         var status_panel = E('div', {}, [
             E('h3', {}, _('Live Status')),
             E('div', { 'class': 'status-card' }, [
@@ -189,8 +186,7 @@ return view.extend({
         ]);
         container.querySelector('.fan-status-container').appendChild(status_panel);
 
-        // 左侧表单（不改任何文本，只改外观）
-        m = new form.Map('fancontrol');                      // 标题与描述沿用Map内部已有文本
+        m = new form.Map('fancontrol');
         m.title = _('Fan Control Settings');
         m.description = _('Configure the parameters for the fan control service.');
 
@@ -204,20 +200,17 @@ return view.extend({
         s.option(form.Value, 'start_temp', _('Start Temperature (°C)'));
 
         m.render().then(function (rendered_form) {
-            var left = container.querySelector('.fan-form-container');
+            var right_container = container.querySelector('.fan-form-container');
 
-            // 顶部“选项卡”外观（仅一个 General，不新增文案）
             var tabs = E('div', { 'class': 'fc-tabs' }, [
                 E('button', { 'class': 'fc-tab active', 'disabled': true }, _('General'))
             ]);
-            left.appendChild(tabs);
+            right_container.appendChild(tabs);
 
-            // 表单卡片容器：包住渲染结果
             var card = E('div', { 'class': 'fan-form-card' });
             card.appendChild(rendered_form);
-            left.appendChild(card);
+            right_container.appendChild(card);
 
-            // 右侧状态赋值
             var isEnabled = uci.get('fancontrol', 'settings', 'enabled') == '1';
             var enabled_span = document.getElementById('status_enabled');
             if (enabled_span) {
@@ -233,7 +226,6 @@ return view.extend({
             if (fan_file) promises.push(L.resolveDefault(callReadFile(fan_file), ''));
 
             Promise.all(promises).then(function (results) {
-                // 温度
                 var temp_str = results[0];
                 var temp_span = document.getElementById('status_temp');
                 if (temp_span && temp_str && temp_str.trim() !== '') {
@@ -244,7 +236,6 @@ return view.extend({
                     temp_span.textContent = _('N/A');
                 }
 
-                // 速度
                 var speed_str = results[1] || results[0];
                 var speed_span = document.getElementById('status_speed');
                 if (speed_span && speed_str && speed_str.trim() !== '') {
@@ -259,7 +250,6 @@ return view.extend({
         return container;
     },
 
-    // 离开页面移除样式，避免影响其他页面
     dispatch: function () {
         var style_tag = document.getElementById('fancontrol-style');
         if (style_tag && style_tag.parentNode)
