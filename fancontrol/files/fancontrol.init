@@ -1,57 +1,55 @@
 #!/bin/sh /etc/rc.common
 
 START=99
-STOP=01
 USE_PROCD=1
 
-NAME=fancontrol
-PROG=/usr/bin/$NAME
+get_config() {
+	config_get_bool enabled $1 enabled 0
+	config_get debug $1 debug 0
+	config_get thermal_file $1 thermal_file
+	config_get fan_file $1 fan_file
+	config_get temp_div $1 temp_div 1000
+}
+
+# 这是一个辅助函数，用来拼接曲线字符串
+append_curve_point() {
+	local val="$1"
+	# UCI里的格式是 "40 36" (中间空格)，我们要改成 "40:36" (中间冒号)
+	# 并且用逗号把所有点连起来
+	local formatted="${val// /:}"
+	if [ -z "$CURVE_STR" ]; then
+		CURVE_STR="$formatted"
+	else
+		CURVE_STR="$CURVE_STR,$formatted"
+	fi
+}
 
 start_service() {
-    config_load "$NAME"
+	config_load fancontrol
+	get_config settings
 
-    local enabled
-    config_get enabled settings enabled
-    [ "$enabled" = "1" ] || { _info "Instance \"$NAME\" disabled."; return 1; }
+	if [ "$enabled" -eq 1 ]; then
+		# 1. 确保系统温控策略是 user_space（防捣乱）
+		for i in /sys/class/thermal/thermal_zone*/policy; do 
+			[ -w "$i" ] && echo user_space > "$i"
+		done
 
-    local thermal_file
-    local fan_file
-    local start_temp
-    local start_speed
-    local max_speed
-    local temp_div
+		# 2. 读取所有的 curve_point 并拼接
+		CURVE_STR=""
+		config_list_foreach settings curve_point append_curve_point
 
-    config_get thermal_file settings thermal_file
-    config_get fan_file settings fan_file
-    config_get start_temp settings start_temp
-    config_get start_speed settings start_speed
-    config_get max_speed settings max_speed
-    config_get temp_div settings temp_div
+		procd_open_instance
+		# 3. 启动 C 程序，传入新的 -c 参数
+		# 注意：把老的 -s -t -m 全都去掉了，换成了 -c "$CURVE_STR"
+		procd_set_param command /usr/sbin/fancontrol \
+			-T "$thermal_file" \
+			-F "$fan_file" \
+			-d "$temp_div" \
+			-c "$CURVE_STR"
 
-    procd_open_instance
-    procd_set_param command $PROG
-    [ -n "$thermal_file" ] && procd_append_param command -T "$thermal_file"
-    [ -n "$fan_file" ] && procd_append_param command -F "$fan_file"
-    [ -n "$start_temp" ] && procd_append_param command -t "$start_temp"
-    [ -n "$start_speed" ] && procd_append_param command -s "$start_speed"
-    [ -n "$max_speed" ] && procd_append_param command -m "$max_speed"
-    [ -n "$temp_div" ] && procd_append_param command -d "$temp_div"
-    procd_set_param respawn
-    procd_close_instance
-}
+		[ "$debug" -eq 1 ] && procd_append_param command -D
 
-start() {
-    start_service
-}
-
-stop() {
-    procd_kill_instance
-}
-
-reload() {
-    procd_reload_instance
-}
-
-service_triggers() {
-    procd_add_reload_trigger "fancontrol"
+		procd_set_param respawn
+		procd_close_instance
+	fi
 }
