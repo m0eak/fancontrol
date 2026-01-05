@@ -3,41 +3,37 @@
 START=99
 USE_PROCD=1
 
-get_config() {
-	config_get_bool enabled $1 enabled 0
-	config_get debug $1 debug 0
-	config_get thermal_file $1 thermal_file
-	config_get fan_file $1 fan_file
-	config_get temp_div $1 temp_div 1000
-	config_get curve_data $1 curve_data
-}
-
 start_service() {
-	config_load fancontrol
-	get_config settings
+    config_load fancontrol
+    
+    # 读取配置
+    config_get_bool enabled settings enabled 0
+    config_get thermal_file settings thermal_file
+    config_get fan_file settings fan_file
+    config_get temp_div settings temp_div 1000
+    config_get curve_data settings curve_data
 
-	if [ "$enabled" -eq 1 ]; then
-        # ★★★ 关键修复1：强制把系统温控策略改为 user_space ★★★
-		for i in /sys/class/thermal/thermal_zone*/policy; do 
-			[ -w "$i" ] && echo user_space > "$i"
-		done
+    if [ "$enabled" -eq 1 ]; then
+        for zone in /sys/class/thermal/thermal_zone*; do
+            echo user_space > "$zone/policy" 2>/dev/null
+        done
 
-        if [ -z "$curve_data" ]; then
-            curve_data="35:0,45:36,60:90,85:255"
-        fi
+        # 默认值保底
+        [ -z "$curve_data" ] && curve_data="35:0,45:36,60:90,85:255"
 
-		procd_open_instance
-		procd_set_param command /usr/bin/fancontrol \
-			-T "$thermal_file" \
-			-F "$fan_file" \
-			-d "$temp_div" \
-			-c "$curve_data"
+        procd_open_instance
+        # ★★★ 确认路径是 /usr/bin ★★★
+        procd_set_param command /usr/bin/fancontrol \
+            -T "$thermal_file" \
+            -F "$fan_file" \
+            -d "$temp_div" \
+            -c "$curve_data"   # <--- 确保这里直接传了字符串
 
-		[ "$debug" -eq 1 ] && procd_append_param command -D
+        procd_append_param command -D
 
-		procd_set_param respawn
-		procd_set_param stdout 1
-		procd_set_param stderr 1
-		procd_close_instance
-	fi
+        procd_set_param respawn
+        procd_set_param stdout 1
+        procd_set_param stderr 1
+        procd_close_instance
+    fi
 }
