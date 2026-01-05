@@ -6,7 +6,7 @@ msgid "Fan Control"
 msgstr "风扇控制"
 
 msgid "Fan General Control"
-msgstr "通用风扇控制"
+msgstr "通用风扇控制小程序"
 
 msgid "Configure fan speed control points."
 msgstr "配置风扇转速控制节点。"
@@ -49,3 +49,9 @@ msgstr "运行中"
 
 msgid "STOPPED"
 msgstr "已停止"
+
+msgid "Configure control points via list."
+msgstr "通过列表参数控制风扇"
+
+msgid "Format: <b>Temp Speed</b>. e.g. <code>45 36</code> (Space separated)."
+msgstr "格式：<b>温度 转速</b>。例如 <code>45 36</code> (空格分隔)。"
