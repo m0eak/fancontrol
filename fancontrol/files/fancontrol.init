@@ -9,7 +9,6 @@ get_config() {
 	config_get thermal_file $1 thermal_file
 	config_get fan_file $1 fan_file
 	config_get temp_div $1 temp_div 1000
-    # 直接读取单行数据
 	config_get curve_data $1 curve_data
 }
 
@@ -18,22 +17,21 @@ start_service() {
 	get_config settings
 
 	if [ "$enabled" -eq 1 ]; then
-        # 强制接管温控
+        # ★★★ 关键修复1：强制把系统温控策略改为 user_space ★★★
 		for i in /sys/class/thermal/thermal_zone*/policy; do 
 			[ -w "$i" ] && echo user_space > "$i"
 		done
 
-        # 如果配置为空，给一个默认值防止C程序崩溃
         if [ -z "$curve_data" ]; then
             curve_data="35:0,45:36,60:90,85:255"
         fi
 
 		procd_open_instance
-		procd_set_param command /usr/sbin/fancontrol \
+		procd_set_param command /usr/bin/fancontrol \
 			-T "$thermal_file" \
 			-F "$fan_file" \
 			-d "$temp_div" \
-			-c "$curve_data"   # 直接传进去
+			-c "$curve_data"
 
 		[ "$debug" -eq 1 ] && procd_append_param command -D
 
