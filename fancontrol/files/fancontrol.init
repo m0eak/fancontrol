@@ -3,14 +3,27 @@
 START=99
 USE_PROCD=1
 
-# 显式定义配置读取函数
+# 定义读取配置
 get_config() {
 	config_get_bool enabled settings enabled 0
 	config_get debug settings debug 0
 	config_get thermal_file settings thermal_file
 	config_get fan_file settings fan_file
 	config_get temp_div settings temp_div 1000
-	config_get curve_data settings curve_data
+    # 注意：curve_point 是 list，不需要在这里读取，下面用 foreach 处理
+}
+
+# 辅助函数：将 "45 36" (空格) 转换为 "45:36" (冒号) 并拼接
+append_curve() {
+    local val="$1"
+    # 使用 tr 替换空格为冒号
+    local pt=$(echo "$val" | tr ' ' ':')
+    
+    if [ -z "$CURVE_STR" ]; then
+        CURVE_STR="$pt"
+    else
+        CURVE_STR="$CURVE_STR,$pt"
+    fi
 }
 
 start_service() {
@@ -18,36 +31,39 @@ start_service() {
     get_config
 
 	if [ "$enabled" -eq 1 ]; then
-        # 1. 强力镇压温控策略 (每次启动时都执行)
+        # 1. 强力屏蔽系统自带温控策略 (Govornor)
+        # 这步不做，风扇会被系统按住不动！
 		for i in /sys/class/thermal/thermal_zone*/policy; do 
 			[ -w "$i" ] && echo user_space > "$i"
 		done
 
-        # 2. 默认值保底
-        if [ -z "$curve_data" ]; then
-            curve_data="35:0,45:36,60:90,85:255"
+        # 2. 遍历配置列表，拼接参数
+        CURVE_STR=""
+        config_list_foreach settings curve_point append_curve
+
+        # 3. 如果没配置曲线，给个默认值防止 C 程序退出
+        if [ -z "$CURVE_STR" ]; then
+            CURVE_STR="35:0,45:36,60:90,85:255"
         fi
 
 		procd_open_instance
-        # 3. 启动进程 (路径已确认为 /usr/bin)
+        # 4. 启动程序 (注意路径是 /usr/bin)
 		procd_set_param command /usr/bin/fancontrol \
 			-T "$thermal_file" \
 			-F "$fan_file" \
 			-d "$temp_div" \
-			-c "$curve_data"
+			-c "$CURVE_STR"
 
 		[ "$debug" -eq 1 ] && procd_append_param command -D
 
-        # 4. 守护进程设置
 		procd_set_param respawn
-		procd_set_param stdout 1   # 让 logread 能看到输出
+		procd_set_param stdout 1
 		procd_set_param stderr 1
 		procd_close_instance
 	fi
 }
 
-# ★★★ 关键修复在这里！ ★★★
-# 这个函数告诉 procd：只要 'fancontrol' 配置文件发生变化，就执行 reload/restart
+# 5. 监听配置变化，自动重启服务
 service_triggers() {
 	procd_add_reload_trigger "fancontrol"
 }

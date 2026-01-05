@@ -105,18 +105,18 @@ void handle_signal(int sig) {
 }
 
 int main(int argc, char* argv[]) {
-    // 防止 printf 被缓存，强制立即输出
+    // 强制禁用输出缓存，保证 logread 实时看到日志
     setbuf(stdout, NULL);
     setbuf(stderr, NULL);
 
     int opt;
-    // ★★★ 修复点：D后面的冒号去掉了，现在 -D 不需要参数了 ★★★
+    // ★★★ D不带冒号，c带冒号 ★★★
     while ((opt = getopt(argc, argv, "T:F:d:Dc:")) != -1) {
         switch (opt) {
             case 'T': strncpy(thermal_file, optarg, MAX_LENGTH); break;
             case 'F': strncpy(fan_file, optarg, MAX_LENGTH); break;
             case 'd': temp_div = atoi(optarg); break;
-            case 'D': debug_mode = 1; break; // 开启调试
+            case 'D': debug_mode = 1; break;
             case 'c': parse_curve(optarg); break;
         }
     }
