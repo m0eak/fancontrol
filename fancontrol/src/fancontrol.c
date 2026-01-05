@@ -7,7 +7,7 @@
 
 #define MAX_LENGTH 200
 #define MAX_POINTS 20    
-#define HYSTERESIS 3     
+#define HYSTERESIS 3     // 这里定义了3度的回差，需要改可以改这里
 
 typedef struct {
     int temp;
@@ -105,12 +105,12 @@ void handle_signal(int sig) {
 }
 
 int main(int argc, char* argv[]) {
-    // 强制禁用输出缓存，保证 logread 实时看到日志
+    // 禁用缓存，保证日志实时输出
     setbuf(stdout, NULL);
     setbuf(stderr, NULL);
 
     int opt;
-    // ★★★ D不带冒号，c带冒号 ★★★
+    // D不带冒号，c带冒号
     while ((opt = getopt(argc, argv, "T:F:d:Dc:")) != -1) {
         switch (opt) {
             case 'T': strncpy(thermal_file, optarg, MAX_LENGTH); break;
@@ -143,10 +143,11 @@ int main(int argc, char* argv[]) {
         if (temp > 0) {
             int target_pwm = calculate_speed_from_curve(temp);
 
-            // 回差逻辑
+            // --- 回差(Hysteresis)逻辑在这里 ---
             if (current_pwm > 0 && target_pwm == 0) {
                 int lowest_active_pwm = 36;
                 int first_active_temp = 100;
+                // 寻找第一个起转点配置
                 for(int i=0; i<curve_count; i++) {
                     if(curve[i].pwm > 0) {
                         lowest_active_pwm = curve[i].pwm;
@@ -154,11 +155,13 @@ int main(int argc, char* argv[]) {
                         break;
                     }
                 }
+                // 如果温度还没降到 (起转温度 - 回差)，就保持运转
                 if (temp >= (first_active_temp - HYSTERESIS)) {
                     target_pwm = lowest_active_pwm;
                 }
             }
             
+            // 只有变化大或者是启停切换时才写入，保护硬件
             if (abs(target_pwm - current_pwm) > 2 || (target_pwm == 0 && current_pwm != 0) || (target_pwm != 0 && current_pwm == 0)) {
                 write_file(fan_file, target_pwm);
             }

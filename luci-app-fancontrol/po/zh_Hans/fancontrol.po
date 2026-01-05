@@ -1,29 +1,36 @@
-msgid "Fan Control Settings"
-msgstr "风扇控制设置"
+msgid ""
+msgstr ""
+"Content-Type: text/plain; charset=UTF-8\n"
 
-msgid "Configure the parameters for the fan control service."
-msgstr "配置风扇控制服务的相关参数。"
+msgid "Fan Control"
+msgstr "风扇控制"
 
-msgid "General"
-msgstr "常规"
+msgid "Fan General Control"
+msgstr "通用风扇控制"
 
-msgid "Enable Service"
-msgstr "启用服务"
+msgid "Configure fan speed control points."
+msgstr "配置风扇转速控制节点。"
 
-msgid "Thermal File Path"
-msgstr "温度文件路径"
+msgid "Settings"
+msgstr "设置"
 
-msgid "Fan Control File Path"
-msgstr "风扇控制文件路径"
+msgid "Enabled"
+msgstr "启用"
 
-msgid "Initial Speed"
-msgstr "启动初始速度"
+msgid "Control Points"
+msgstr "控制节点"
 
-msgid "Max Speed"
-msgstr "最大速度"
+msgid "Enter \"Temp Speed\". (e.g. <code>45 36</code> or <code>45:36</code>)"
+msgstr "输入\"温度 转速\" (例如 <code>45 36</code> 或 <code>45:36</code>)"
 
-msgid "Start Temperature (°C)"
-msgstr "启动温度 (°C)"
+msgid "Invalid format! Use: Temp Speed (e.g. 45 36)"
+msgstr "格式无效！请使用：温度 转速 (例如 45 36)"
+
+msgid "Thermal File"
+msgstr "温度检测文件"
+
+msgid "Fan File"
+msgstr "风扇控制文件"
 
 msgid "Live Status"
 msgstr "实时状态"
@@ -31,26 +38,14 @@ msgstr "实时状态"
 msgid "Service Status"
 msgstr "服务状态"
 
-msgid "CPU Temperature"
-msgstr "CPU 温度"
+msgid "Temperature"
+msgstr "温度"
 
-msgid "Fan Speed Level"
-msgstr "风扇转速等级"
+msgid "Fan PWM"
+msgstr "风扇 PWM"
 
-msgid "Loading..."
-msgstr "正在加载..."
-
-msgid "Running"
+msgid "RUNNING"
 msgstr "运行中"
 
-msgid "Stopped"
+msgid "STOPPED"
 msgstr "已停止"
-
-msgid "Invalid"
-msgstr "无效"
-
-msgid "N/A"
-msgstr "不可用"
-
-msgid "Fan General Control"
-msgstr "通用风扇控制小程序"
