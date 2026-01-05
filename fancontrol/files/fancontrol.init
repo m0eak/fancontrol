@@ -9,17 +9,8 @@ get_config() {
 	config_get thermal_file $1 thermal_file
 	config_get fan_file $1 fan_file
 	config_get temp_div $1 temp_div 1000
-}
-
-append_curve_point() {
-	local val="$1"
-	# 使用 tr 命令替换空格为冒号，这是最兼容的写法
-	local formatted=$(echo "$val" | tr ' ' ':')
-	if [ -z "$CURVE_STR" ]; then
-		CURVE_STR="$formatted"
-	else
-		CURVE_STR="$CURVE_STR,$formatted"
-	fi
+    # 直接读取单行数据
+	config_get curve_data $1 curve_data
 }
 
 start_service() {
@@ -27,27 +18,26 @@ start_service() {
 	get_config settings
 
 	if [ "$enabled" -eq 1 ]; then
-		# 确保接管温控
+        # 强制接管温控
 		for i in /sys/class/thermal/thermal_zone*/policy; do 
 			[ -w "$i" ] && echo user_space > "$i"
 		done
 
-		CURVE_STR=""
-		config_list_foreach settings curve_point append_curve_point
+        # 如果配置为空，给一个默认值防止C程序崩溃
+        if [ -z "$curve_data" ]; then
+            curve_data="35:0,45:36,60:90,85:255"
+        fi
 
 		procd_open_instance
-		# 传入所有参数
 		procd_set_param command /usr/sbin/fancontrol \
 			-T "$thermal_file" \
 			-F "$fan_file" \
 			-d "$temp_div" \
-			-c "$CURVE_STR"
+			-c "$curve_data"   # 直接传进去
 
 		[ "$debug" -eq 1 ] && procd_append_param command -D
 
-		# 发生错误自动重启
 		procd_set_param respawn
-		# 输出日志到 logread
 		procd_set_param stdout 1
 		procd_set_param stderr 1
 		procd_close_instance
