@@ -12,8 +12,6 @@ var callReadFile = rpc.declare({
     expect: { data: '' }
 });
 
-// 喵！这里引入了暗黑模式适配的 CSS
-// 我们使用 CSS 变量来控制颜色，这样 theme 切换时会自动变色
 var css = `
     :root {
         --fc-bg: #ffffff;
@@ -26,21 +24,19 @@ var css = `
         --fc-tooltip-text: #fff;
     }
 
-    /* 暗黑模式适配 (适配主流 OpenWrt 主题) */
     @media (prefers-color-scheme: dark) {
         :root {
-            --fc-bg: #2a2a2a;         /* 深色背景 */
-            --fc-border: #444444;     /* 深色边框 */
-            --fc-text-main: #eeeeee;  /* 浅色文字 */
-            --fc-text-sub: #aaaaaa;   /* 浅灰副标题 */
-            --fc-grid: #444444;       /* 深色网格 */
+            --fc-bg: #2a2a2a;
+            --fc-border: #444444;
+            --fc-text-main: #eeeeee;
+            --fc-text-sub: #aaaaaa;
+            --fc-grid: #444444;
             --fc-axis: #888888;
             --fc-tooltip-bg: rgba(255,255,255,0.9);
             --fc-tooltip-text: #000;
         }
     }
     
-    /* 某些主题通过 class="dark" 启用暗黑模式 */
     body.dark :root, [data-theme="dark"] :root {
         --fc-bg: #2a2a2a;
         --fc-border: #444444;
@@ -54,7 +50,6 @@ var css = `
     .fan-monitor-col { flex: 1; min-width: 250px; }
     .fan-settings-col { flex: 2; min-width: 350px; }
 
-    /* 监控卡片 */
     .monitor-card {
         background: var(--fc-bg); 
         border: 1px solid var(--fc-border); 
@@ -75,7 +70,6 @@ var css = `
     .monitor-label { font-size: 12px; color: var(--fc-text-sub); display: block; }
     .monitor-value { font-size: 18px; font-weight: bold; color: var(--fc-text-main); }
 
-    /* 曲线图表 */
     .curve-widget-wrap { position: relative; width: 100%; user-select: none; }
     
     .curve-svg { 
@@ -103,7 +97,6 @@ var css = `
     }
 `;
 
-// --- 自定义 CurveWidget 组件 ---
 var CurveWidget = form.AbstractValue.extend({
     __name__: 'CurveWidget',
 
@@ -112,7 +105,6 @@ var CurveWidget = form.AbstractValue.extend({
         if (!Array.isArray(val) || val.length < 2) {
             val = ['35 0', '45 36', '60 90', '85 255'];
         }
-        // ★★★ 关键修复：初始化时就解析并缓存，确保 formValue 能读到初始值 ★★★
         this.currentPoints = this.parsePoints(val);
         return val;
     },
@@ -131,7 +123,6 @@ var CurveWidget = form.AbstractValue.extend({
 
     renderWidget: function(section_id, option_id, cfgvalue) {
         var self = this;
-        // 使用 cfgvalue 解析，或者如果已经有缓存（来自交互）则使用缓存
         var points = this.currentPoints || this.parsePoints(cfgvalue);
         this.currentPoints = points;
         
@@ -153,7 +144,6 @@ var CurveWidget = form.AbstractValue.extend({
         function p2y(p) { return vH - pad.b - (Math.max(0, Math.min(255, p)) / 255) * innerH; }
         function y2p(y) { return Math.round(((vH - pad.b - y) / innerH) * 255); }
 
-        // 背景网格
         var gridG = document.createElementNS('http://www.w3.org/2000/svg', 'g');
         var pathD = '';
         for(var i=0; i<=5; i++) {
@@ -246,8 +236,6 @@ var CurveWidget = form.AbstractValue.extend({
                         c.classList.remove('dragging');
                         tooltip.style.display = 'none';
                         
-                        // ★★★ 显式通知 Map 数据已变更 ★★★
-                        // 虽然 formValue 会读 currentPoints，但有时候需要触发一下事件让 Save 按钮变亮
                         if (self.section) dom.callClassMethod(self.section.node, 'triggerValidation');
                     }
 
@@ -267,7 +255,6 @@ var CurveWidget = form.AbstractValue.extend({
     },
 
     formValue: function(section_id) {
-        // 这里的 self.currentPoints 已经在拖拽时实时更新了
         var pts = this.currentPoints || [];
         return pts.map(function(pt) { return pt.t + ' ' + pt.p; });
     }
@@ -312,16 +299,20 @@ return view.extend({
             settingsCol.appendChild(node);
         });
 
-        var s = m.section(form.TypedSection, 'settings', _('Settings'));
+        // 这里一定要改成 'fancontrol'，因为你的配置文件类型是 fancontrol
+        // 之前误写成了 'settings'，导致 LuCI 找不到对应的配置段，所以就是空白的
+        var s = m.section(form.TypedSection, 'fancontrol', _('Settings'));
         s.anonymous = true;
 
         s.option(form.Flag, 'enabled', _('Enable Fan Control'));
         
         var o = s.option(form.Value, 'thermal_file', _('Thermal Source'));
         o.placeholder = '/sys/devices/virtual/thermal/thermal_zone0/temp';
+        o.optional = true; // 设为可选，非专家用户可以不填
         
         o = s.option(form.Value, 'fan_file', _('Fan Control Node'));
         o.placeholder = '/sys/devices/virtual/thermal/cooling_device0/cur_state';
+        o.optional = true;
 
         s.option(CurveWidget, 'curve_point', _('Speed Curve'), 
             _('Drag points to set: Temp(X) vs Speed(Y).'));
@@ -331,8 +322,6 @@ return view.extend({
         return container;
     },
     
-    // ★★★ 确保 Save & Apply 能正常工作 ★★★
-    // 如果没有改动，LuCI 默认可能不会触发，这里我们在交互中已经处理了数据流
     handleSaveApply: function (ev, mode) {
         return this.super('handleSaveApply', arguments);
     }
@@ -356,7 +345,6 @@ function pollData() {
             if(elP) elP.innerText = isNaN(pwmRaw) ? 'N/A' : pwmRaw;
             if(elS) {
                 elS.innerText = enabled ? _('Running') : _('Stopped');
-                // 使用适配暗黑模式的绿色/红色，避免深红在黑色背景看不清
                 elS.style.color = enabled ? '#34d399' : '#f87171';
             }
         });
