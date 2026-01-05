@@ -70,7 +70,7 @@ var css = `
     .monitor-label { font-size: 12px; color: var(--fc-text-sub); display: block; }
     .monitor-value { font-size: 18px; font-weight: bold; color: var(--fc-text-main); }
 
-    .curve-widget-wrap { position: relative; width: 100%; user-select: none; }
+    .curve-widget-wrap { position: relative; width: 100%; user-select: none; margin-top: 5px; }
     
     .curve-svg { 
         width: 100%; height: auto; display: block; 
@@ -97,7 +97,9 @@ var css = `
     }
 `;
 
-var CurveWidget = form.AbstractValue.extend({
+// ★★★ 这里的 form.AbstractValue 改成了 form.Value ★★★
+// 这是修复 InternalError 的关键！
+var CurveWidget = form.Value.extend({
     __name__: 'CurveWidget',
 
     cfgvalue: function(section_id) {
@@ -121,6 +123,7 @@ var CurveWidget = form.AbstractValue.extend({
         return pts;
     },
 
+    // form.Value 会自动调用 renderWidget 来绘制输入区域
     renderWidget: function(section_id, option_id, cfgvalue) {
         var self = this;
         var points = this.currentPoints || this.parsePoints(cfgvalue);
@@ -236,6 +239,7 @@ var CurveWidget = form.AbstractValue.extend({
                         c.classList.remove('dragging');
                         tooltip.style.display = 'none';
                         
+                        // 强制触发 LuCI 验证
                         if (self.section) dom.callClassMethod(self.section.node, 'triggerValidation');
                     }
 
@@ -299,8 +303,7 @@ return view.extend({
             settingsCol.appendChild(node);
         });
 
-        // 这里一定要改成 'fancontrol'，因为你的配置文件类型是 fancontrol
-        // 之前误写成了 'settings'，导致 LuCI 找不到对应的配置段，所以就是空白的
+        // 确保配置节点名称与你的 /etc/config/fancontrol 一致
         var s = m.section(form.TypedSection, 'fancontrol', _('Settings'));
         s.anonymous = true;
 
@@ -308,7 +311,7 @@ return view.extend({
         
         var o = s.option(form.Value, 'thermal_file', _('Thermal Source'));
         o.placeholder = '/sys/devices/virtual/thermal/thermal_zone0/temp';
-        o.optional = true; // 设为可选，非专家用户可以不填
+        o.optional = true;
         
         o = s.option(form.Value, 'fan_file', _('Fan Control Node'));
         o.placeholder = '/sys/devices/virtual/thermal/cooling_device0/cur_state';
