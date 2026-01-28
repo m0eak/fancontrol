@@ -78,40 +78,68 @@ var css = `
 `;
 
 return view.extend({
+    pollingTimer: null,
+
     load: function () {
-        return Promise.all([ uci.load('fancontrol') ]);
+        return Promise.all([uci.load('fancontrol')]);
+    },
+
+    updateStatus: function() {
+        var thermal_file = uci.get('fancontrol', 'settings', 'thermal_file');
+        var fan_file = uci.get('fancontrol', 'settings', 'fan_file');
+        var temp_div = uci.get('fancontrol', 'settings', 'temp_div') || 1000;
+
+        var promises = [];
+        if (thermal_file) promises.push(L.resolveDefault(callReadFile(thermal_file), null));
+        if (fan_file) promises.push(L.resolveDefault(callReadFile(fan_file), null));
+
+        return Promise.all(promises).then(function (results) {
+            var temp_str = results[0];
+            var speed_str = results[1];
+
+            var temp_span = document.getElementById('status_temp');
+            if (temp_span) {
+                if (temp_str != null && temp_str.trim() !== '') {
+                    var temp = parseInt(temp_str, 10);
+                    temp_span.innerText = !isNaN(temp) ? (temp / temp_div).toFixed(1) + ' °C' : _('Invalid');
+                } else {
+                    temp_span.innerText = _('N/A');
+                }
+            }
+
+            var speed_span = document.getElementById('status_speed');
+            if (speed_span) {
+                if (speed_str != null && speed_str.trim() !== '') {
+                    var speed = parseInt(speed_str, 10);
+                    speed_span.innerText = !isNaN(speed) ? speed : _('Invalid');
+                } else {
+                    speed_span.innerText = _('N/A');
+                }
+            }
+        });
     },
 
     render: function (data) {
-        var m, s;
+        var m, s, o;
 
-        // 注入布局CSS
         var style_tag = E('style', { id: 'fancontrol-style', type: 'text/css' }, css);
         dom.append(document.head, style_tag);
-        
-        // 创建Flex布局容器
+
         var container = E('div', { 'class': 'fan-control-container' }, [
-            // 左侧容器：放监控
-            E('div', { 'class': 'fan-status-container' }), 
-            // 右侧容器：放表单
-            E('div', { 'class': 'fan-form-container' })      
+            E('div', { 'class': 'fan-status-container' }),
+            E('div', { 'class': 'fan-form-container' })
         ]);
 
-        // --- 左侧：监控面板 ---
-        // 使用 'cbi-section' 类，这样它就会拥有和系统一模一样的边框和背景
         var status_panel = E('div', { 'class': 'cbi-section' }, [
             E('h3', {}, _('Live Status')),
-            
             E('div', { 'class': 'cbi-section-node', 'style': 'padding: 1rem;' }, [
-                // 服务状态
                 E('div', { 'class': 'status-item' }, [
                     E('div', { 'class': 'status-icon' }, '⚡'),
                     E('div', { 'class': 'status-text' }, [
                         E('label', {}, _('Service Status')),
-                        E('strong', { 'id': 'status_enabled' }, _('Loading...'))
+                        E('strong', { 'id': 'status_enabled' })
                     ])
                 ]),
-                // CPU温度
                 E('div', { 'class': 'status-item' }, [
                     E('div', { 'class': 'status-icon' }, '🌡️'),
                     E('div', { 'class': 'status-text' }, [
@@ -119,7 +147,6 @@ return view.extend({
                         E('strong', { 'id': 'status_temp' }, _('Loading...'))
                     ])
                 ]),
-                // 风扇转速
                 E('div', { 'class': 'status-item' }, [
                     E('div', { 'class': 'status-icon' }, '💨'),
                     E('div', { 'class': 'status-text' }, [
@@ -129,73 +156,59 @@ return view.extend({
                 ])
             ])
         ]);
-        
-        // 把原生的面板放入左侧容器
         container.querySelector('.fan-status-container').appendChild(status_panel);
 
-        // --- 右侧：设置表单 ---
         m = new form.Map('fancontrol', _('Fan Control Settings'), _('Configure the parameters for the fan control service.'));
-        
         s = m.section(form.TypedSection, 'fancontrol', _('General'));
         s.anonymous = true;
+
+        o = s.option(form.Flag, 'enabled', _('Enable Service'));
+        o = s.option(form.Value, 'thermal_file', _('Thermal File Path'));
+        o = s.option(form.Value, 'fan_file', _('Fan Control File Path'));
+
+        o = s.option(form.Value, 'start_speed', _('Initial Speed'));
+        o.description = _('The minimum speed level when the fan is running.');
         
-        s.option(form.Flag, 'enabled', _('Enable Service'));
-        s.option(form.Value, 'thermal_file', _('Thermal File Path'));
-        s.option(form.Value, 'fan_file', _('Fan Control File Path'));
-        s.option(form.Value, 'start_speed', _('Initial Speed'));
-        s.option(form.Value, 'max_speed', _('Max Speed'));
-        s.option(form.Value, 'start_temp', _('Start Temperature (°C)'));
+        o = s.option(form.Value, 'max_speed', _('Max Speed'));
+        o.description = _('The maximum speed level of the fan.');
+        
+        o = s.option(form.Value, 'start_temp', _('Start Temperature (°C)'));
+        o.description = _('When the temperature reaches this value, the fan starts spinning.');
+        
+        o = s.option(form.Value, 'max_temp', _('Max Temperature (°C)'));
+        o.description = _('The temperature at which the fan should run at maximum speed.');
+        
+        o = s.option(form.Value, 'hysteresis_temp', _('Hysteresis Temperature (°C)'));
+        o.description = _('The fan will not stop until the temperature drops below (Start Temperature - Hysteresis).');
 
-        // 渲染表单
-        m.render().then(function (rendered_form) {
-            // 直接把渲染出来的原生表单放入右侧容器
-            // 不再包裹任何自定义的 div，确保样式纯正
-            container.querySelector('.fan-form-container').appendChild(rendered_form);
+        var isEnabled = uci.get('fancontrol', 'settings', 'enabled') == '1';
+        var enabled_span = container.querySelector('#status_enabled');
+        if (enabled_span) {
+            enabled_span.innerHTML = isEnabled
+                ? '<span style="color:green">' + _('Running') + '</span>'
+                : '<span style="color:red">' + _('Stopped') + '</span>';
+        }
 
-            // --- 数据更新逻辑 (保持不变) ---
-            var isEnabled = uci.get('fancontrol', 'settings', 'enabled') == '1';
-            var enabled_span = document.getElementById('status_enabled');
-            if (enabled_span) {
-                enabled_span.innerHTML = isEnabled 
-                    ? '<span style="color:green">' + _('Running') + '</span>' 
-                    : '<span style="color:red">' + _('Stopped') + '</span>';
-            }
+        // Poll every 5 seconds
+        this.pollingTimer = setInterval(L.bind(this.updateStatus, this), 5000);
 
-            var thermal_file = uci.get('fancontrol', 'settings', 'thermal_file');
-            var fan_file = uci.get('fancontrol', 'settings', 'fan_file');
+        // Initial status update
+        this.updateStatus();
 
-            var promises = [];
-            if (thermal_file) promises.push(L.resolveDefault(callReadFile(thermal_file), ''));
-            if (fan_file) promises.push(L.resolveDefault(callReadFile(fan_file), ''));
-
-            Promise.all(promises).then(function (results) {
-                var temp_str = results[0];
-                var temp_span = document.getElementById('status_temp');
-                if (temp_span && temp_str && temp_str.trim() !== '') {
-                    var temp = parseInt(temp_str);
-                    var temp_div = uci.get('fancontrol', 'settings', 'temp_div') || 1000;
-                    temp_span.innerText = !isNaN(temp) ? (temp / temp_div).toFixed(1) + ' °C' : _('Invalid');
-                } else if (temp_span) {
-                    temp_span.innerText = _('N/A');
-                }
-
-                var speed_str = results[1] || results[0];
-                var speed_span = document.getElementById('status_speed');
-                if (speed_span && speed_str && speed_str.trim() !== '') {
-                    var speed = parseInt(speed_str);
-                    speed_span.innerText = !isNaN(speed) ? speed : _('Invalid');
-                } else if (speed_span) {
-                    speed_span.innerText = _('N/A');
-                }
-            });
-        });
-
-        return container;
+        return m.render().then(L.bind(function (map_rendered) {
+            container.querySelector('.fan-form-container').appendChild(map_rendered);
+            return container;
+        }, this));
     },
 
     dispatch: function () {
         var style_tag = document.getElementById('fancontrol-style');
-        if (style_tag && style_tag.parentNode)
+        if (style_tag && style_tag.parentNode) {
             style_tag.parentNode.removeChild(style_tag);
+        }
+        if (this.pollingTimer) {
+            clearInterval(this.pollingTimer);
+            this.pollingTimer = null;
+        }
     }
 });

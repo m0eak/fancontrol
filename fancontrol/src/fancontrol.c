@@ -6,18 +6,17 @@
 #include <signal.h>   
   
 #define MAX_LENGTH 200  
-#define MAX_TEMP 120  
-#define HYSTERESIS 5  // 定义回差温度为 5度
+// 定义全局变量
+char thermal_file[MAX_LENGTH] = "/sys/devices/virtual/thermal/thermal_zone0/temp";      // -T
+char fan_file[MAX_LENGTH] = "/sys/devices/virtual/thermal/cooling_device0/cur_state";   // -F
 
-// 定义全局变量  
-char thermal_file[MAX_LENGTH] = "/sys/devices/virtual/thermal/thermal_zone0/temp";      // -T  
-char fan_file[MAX_LENGTH] = "/sys/devices/virtual/thermal/cooling_device0/cur_state";   // -F  
-  
-int start_speed = 35;   // -s  
-int start_temp = 45;    // -t  
-int max_speed = 255;    // -m  
-int temp_div = 1000;    // -d  
-int debug_mode = 0;     // -D  
+int start_speed = 35;   // -s
+int start_temp = 45;    // -t
+int max_speed = 255;    // -m
+int temp_div = 1000;    // -d
+int debug_mode = 0;     // -D
+int max_temp = 85;      // -M
+int hysteresis_temp = 5;// -H
   
 /**  
  * 底层读文件  
@@ -139,7 +138,7 @@ void register_signal_handlers( ) {
 int main(int argc ,char* argv[ ]) {  
     // 解析命令行选项  
     int opt;  
-    while (( opt = getopt(argc ,argv ,"T:F:s:t:m:d:D:v:") ) != -1) {  
+    while (( opt = getopt(argc ,argv ,"T:F:s:t:m:d:D:v:M:H:") ) != -1) {
         switch (opt) {  
             case 'T':  
                 snprintf(thermal_file ,sizeof(thermal_file) ,"%s" ,optarg);  
@@ -160,12 +159,18 @@ int main(int argc ,char* argv[ ]) {
                 temp_div = atoi(optarg);  
                 break;  
             case 'D':  
-                debug_mode = atoi(optarg);  
-                break;  
-            default:  
-                exit(EXIT_FAILURE);  
-        }  
-    }  
+                debug_mode = atoi(optarg);
+                break;
+            case 'M':
+                max_temp = atoi(optarg);
+                break;
+            case 'H':
+                hysteresis_temp = atoi(optarg);
+                break;
+            default:
+                exit(EXIT_FAILURE);
+        }
+    }
     // 检测虚拟文件是否存在  
     if (file_exist(fan_file) != 0 || file_exist(thermal_file) != 0) {  
         fprintf(stderr ,"File: '%s' or '%s' not exist\n" ,fan_file ,thermal_file);  
@@ -175,49 +180,52 @@ int main(int argc ,char* argv[ ]) {
     // 注册退出信号  
     register_signal_handlers( );  
   
-    // 监控风扇  
-    while (1) {  
-        int temperature = get_temperature(thermal_file ,temp_div);  
-        int current_fan_val = get_fanspeed(fan_file); // 获取当前风扇状态
+    // 监控风扇
+    int last_set_speed = get_fanspeed(fan_file); // 程序启动时，先获取一次风扇的当前状态
+    while (1) {
+        int temperature = get_temperature(thermal_file ,temp_div);
         int target_speed = 0;
 
         // 只有读到有效温度才处理
-        if (temperature > 0) {  
+        if (temperature > 0) {
 
-            if (current_fan_val > 0) {
+            if (last_set_speed > 0) {
                 // 如果风扇已经在转了 (Running) ---
-                // 只有温度低于 (启动温度 - 5度) 时才关停
-                if (temperature < (start_temp - HYSTERESIS)) {
-                    target_speed = 0; 
+                // 只有温度低于 (启动温度 - 回差) 时才关停
+                if (temperature < (start_temp - hysteresis_temp)) {
+                    target_speed = 0;
                 } else {
                     // 否则继续转！
-                    // 如果温度在缓刑区 (60度~65度)，就用最低档转速 (start_speed) 维持
+                    // 如果温度低于启动温度，就用最低档转速 (start_speed) 维持
                     if (temperature < start_temp) {
                         target_speed = start_speed;
                     } else {
                         // 超过启动温度，正常按曲线加速
-                        target_speed = calculate_speed(temperature ,MAX_TEMP ,start_temp ,max_speed ,start_speed);
+                        target_speed = calculate_speed(temperature ,max_temp ,start_temp ,max_speed ,start_speed);
                     }
                 }
             } else {
                 // --- 如果风扇是停着的 (Stopped) ---
                 // 只有温度达到或超过 启动温度 才开始转
                 if (temperature >= start_temp) {
-                    target_speed = calculate_speed(temperature ,MAX_TEMP ,start_temp ,max_speed ,start_speed);
+                    target_speed = calculate_speed(temperature ,max_temp ,start_temp ,max_speed ,start_speed);
                 } else {
                     target_speed = 0;
                 }
             }
             
-            // 执行设置
-            set_fanspeed(target_speed ,fan_file);  
-        }  
+            // 仅当目标速度与上次设置的速度不同时才写入文件
+            if (target_speed != last_set_speed) {
+                set_fanspeed(target_speed ,fan_file);
+                last_set_speed = target_speed;
+            }
+        }
         
-        if (debug_mode) {  
-            fprintf(stdout ,"Temp: %d°C, Status: %s, TargetSpeed: %d\n", 
-                temperature, (current_fan_val > 0 ? "RUN" : "STOP"), target_speed);  
-        }  
-        sleep(5);  
-    }  
+        if (debug_mode) {
+            fprintf(stdout ,"Temp: %d°C, Status: %s, TargetSpeed: %d\n",
+                temperature, (last_set_speed > 0 ? "RUN" : "STOP"), target_speed);
+        }
+        sleep(5);
+    }
     return 0;  
 }
