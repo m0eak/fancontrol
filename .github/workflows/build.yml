@@ -1,0 +1,109 @@
+name: Build and Release
+
+permissions:
+  contents: write
+
+on:
+  push:
+    branches:
+      - main
+      - master
+  workflow_dispatch:
+
+env:
+  SDK_URL: https://immortalwrt.kyarucloud.moe/releases/25.12-SNAPSHOT/targets/qualcommax/ipq60xx/immortalwrt-sdk-25.12-SNAPSHOT-qualcommax-ipq60xx_gcc-14.3.0_musl.Linux-x86_64.tar.zst
+
+jobs:
+  check_version:
+    runs-on: ubuntu-latest
+    outputs:
+      exists: ${{ steps.check_tag.outputs.exists }}
+      version: ${{ steps.get_version.outputs.version }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+      
+      - name: Get Version
+        id: get_version
+        run: |
+          VERSION=$(grep '^PKG_VERSION:=' fancontrol/Makefile | awk -F':=' '{print $2}' | xargs)
+          RELEASE=$(grep '^PKG_RELEASE:=' fancontrol/Makefile | awk -F':=' '{print $2}' | xargs)
+          FULL_VERSION="v$VERSION-$RELEASE"
+          echo "version=$FULL_VERSION" >> $GITHUB_OUTPUT
+          echo "Detected version: $FULL_VERSION"
+
+      - name: Check if tag exists
+        id: check_tag
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const tagName = '${{ steps.get_version.outputs.version }}';
+            const { owner, repo } = context.repo;
+            try {
+              await github.rest.git.getRef({ owner, repo, ref: `tags/${tagName}` });
+              console.log(`Tag ${tagName} exists.`);
+              core.setOutput('exists', 'true');
+            } catch (error) {
+              console.log(`Tag ${tagName} does not exist.`);
+              core.setOutput('exists', 'false');
+            }
+
+  build:
+    needs: check_version
+    if: needs.check_version.outputs.exists == 'false' || github.event_name == 'workflow_dispatch'
+    runs-on: ubuntu-latest
+    
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Install Dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y build-essential clang flex bison g++ gawk gcc-multilib g++-multilib gettext git libncurses-dev libssl-dev python3-distutils rsync unzip zlib1g-dev file wget zstd
+
+      - name: Download and Extract SDK
+        run: |
+          wget -qO- "$SDK_URL" | tar --zstd -xf -
+          mv immortalwrt-sdk-* sdk
+
+      - name: Prepare Feeds
+        working-directory: sdk
+        run: |
+          ./scripts/feeds update -a
+          ./scripts/feeds install -a
+
+      - name: Prepare Package
+        run: |
+          mkdir -p sdk/package/fancontrol-packages
+          cp -r fancontrol sdk/package/fancontrol-packages/
+          cp -r luci-app-fancontrol sdk/package/fancontrol-packages/
+
+      - name: Compile
+        working-directory: sdk
+        run: |
+          make defconfig
+          make package/fancontrol-packages/fancontrol/compile V=s
+          make package/fancontrol-packages/luci-app-fancontrol/compile V=s
+
+      - name: Organize Artifacts
+        run: |
+          mkdir -p artifacts
+          find sdk/bin -name "fancontrol*.ipk" -exec cp {} artifacts/ \;
+          find sdk/bin -name "luci-app-fancontrol*.ipk" -exec cp {} artifacts/ \;
+          ls -l artifacts/
+
+      - name: Upload Artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: ipk-packages-${{ needs.check_version.outputs.version }}
+          path: artifacts/
+
+      - name: Release
+        uses: softprops/action-gh-release@v1
+        if: needs.check_version.outputs.exists == 'false'
+        with:
+          tag_name: ${{ needs.check_version.outputs.version }}
+          files: artifacts/*.ipk
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
