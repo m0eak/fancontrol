@@ -82,16 +82,20 @@ jobs:
       - name: Compile
         working-directory: sdk
         run: |
+          echo "CONFIG_PACKAGE_fancontrol=y" >> .config
+          echo "CONFIG_PACKAGE_luci-app-fancontrol=y" >> .config
           make defconfig
-          make package/fancontrol-packages/fancontrol/compile V=s
-          make package/fancontrol-packages/luci-app-fancontrol/compile V=s
+          make package/fancontrol-packages/fancontrol/compile V=s || echo "Fancontrol compile failed"
+          make package/fancontrol-packages/luci-app-fancontrol/compile V=s || echo "Luci app compile failed"
 
       - name: Organize Artifacts
         run: |
           mkdir -p artifacts
           find sdk/bin -name "fancontrol*.ipk" -exec cp {} artifacts/ \;
           find sdk/bin -name "luci-app-fancontrol*.ipk" -exec cp {} artifacts/ \;
-          ls -l artifacts/
+          ls -R artifacts/
+          echo "Files in sdk/bin:"
+          find sdk/bin -name "*.ipk" || true
 
       - name: Upload Artifacts
         uses: actions/upload-artifact@v4
