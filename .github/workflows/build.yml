@@ -2,6 +2,7 @@ name: Build and Release
 
 permissions:
   contents: write
+  actions: write
 
 on:
   push:
@@ -14,45 +15,9 @@ env:
   SDK_URL: https://immortalwrt.kyarucloud.moe/releases/25.12-SNAPSHOT/targets/qualcommax/ipq60xx/immortalwrt-sdk-25.12-SNAPSHOT-qualcommax-ipq60xx_gcc-14.3.0_musl.Linux-x86_64.tar.zst
 
 jobs:
-  check_version:
-    runs-on: ubuntu-latest
-    outputs:
-      exists: ${{ steps.check_tag.outputs.exists }}
-      version: ${{ steps.get_version.outputs.version }}
-    steps:
-      - name: Checkout
-        uses: actions/checkout@v4
-      
-      - name: Get Version
-        id: get_version
-        run: |
-          VERSION=$(grep '^PKG_VERSION:=' fancontrol/Makefile | awk -F':=' '{print $2}' | xargs)
-          RELEASE=$(grep '^PKG_RELEASE:=' fancontrol/Makefile | awk -F':=' '{print $2}' | xargs)
-          FULL_VERSION="v$VERSION-$RELEASE"
-          echo "version=$FULL_VERSION" >> $GITHUB_OUTPUT
-          echo "Detected version: $FULL_VERSION"
-
-      - name: Check if tag exists
-        id: check_tag
-        uses: actions/github-script@v7
-        with:
-          script: |
-            const tagName = '${{ steps.get_version.outputs.version }}';
-            const { owner, repo } = context.repo;
-            try {
-              await github.rest.git.getRef({ owner, repo, ref: `tags/${tagName}` });
-              console.log(`Tag ${tagName} exists.`);
-              core.setOutput('exists', 'true');
-            } catch (error) {
-              console.log(`Tag ${tagName} does not exist.`);
-              core.setOutput('exists', 'false');
-            }
-
   build:
-    needs: check_version
-    if: needs.check_version.outputs.exists == 'false' || github.event_name == 'workflow_dispatch'
     runs-on: ubuntu-latest
-    
+
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -91,23 +56,44 @@ jobs:
       - name: Organize Artifacts
         run: |
           mkdir -p artifacts
-          find sdk/bin -name "fancontrol*.ipk" -exec cp {} artifacts/ \;
-          find sdk/bin -name "luci-app-fancontrol*.ipk" -exec cp {} artifacts/ \;
+          # 查找所有 apk 文件，排除 SDK 自带的包，只保留我们编译的
+          find sdk/bin -name "fancontrol*.apk" -exec cp {} artifacts/ \;
+          find sdk/bin -name "luci-app-fancontrol*.apk" -exec cp {} artifacts/ \;
+          find sdk/bin -name "luci-i18n-fancontrol*.apk" -exec cp {} artifacts/ \;
           ls -R artifacts/
-          echo "Files in sdk/bin:"
-          find sdk/bin -name "*.ipk" || true
+
+      - name: Generate Release Tag
+        id: tag
+        run: |
+          DATE=$(date +'%Y.%m.%d-%H%M')
+          VERSION=$(grep '^PKG_VERSION:=' fancontrol/Makefile | awk -F':=' '{print $2}' | xargs)
+          RELEASE_TAG="${DATE}-v${VERSION}"
+          echo "release_tag=$RELEASE_TAG" >> $GITHUB_OUTPUT
+          echo "Generated release tag: $RELEASE_TAG"
 
       - name: Upload Artifacts
         uses: actions/upload-artifact@v4
         with:
-          name: ipk-packages-${{ needs.check_version.outputs.version }}
+          name: packages-${{ steps.tag.outputs.release_tag }}
           path: artifacts/
 
       - name: Release
         uses: softprops/action-gh-release@v1
-        if: needs.check_version.outputs.exists == 'false'
         with:
-          tag_name: ${{ needs.check_version.outputs.version }}
-          files: artifacts/*.ipk
+          tag_name: ${{ steps.tag.outputs.release_tag }}
+          name: Release ${{ steps.tag.outputs.release_tag }}
+          files: artifacts/*.apk
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+  delete_runs:
+    runs-on: ubuntu-latest
+    needs: build
+    steps:
+      - name: Delete workflow runs
+        uses: Mattraks/delete-workflow-runs@v2
+        with:
+          token: ${{ secrets.GITHUB_TOKEN }}
+          repository: ${{ github.repository }}
+          retain_days: 1
+          keep_minimum_runs: 3
