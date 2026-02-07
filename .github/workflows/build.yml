@@ -67,7 +67,8 @@ jobs:
         run: |
           DATE=$(date +'%Y.%m.%d-%H%M')
           VERSION=$(grep '^PKG_VERSION:=' fancontrol/Makefile | awk -F':=' '{print $2}' | xargs)
-          RELEASE_TAG="${DATE}-v${VERSION}"
+          RELEASE=$(grep '^PKG_RELEASE:=' fancontrol/Makefile | awk -F':=' '{print $2}' | xargs)
+          RELEASE_TAG="${DATE}-v${VERSION}-r${RELEASE}"
           echo "release_tag=$RELEASE_TAG" >> $GITHUB_OUTPUT
           echo "Generated release tag: $RELEASE_TAG"
 
