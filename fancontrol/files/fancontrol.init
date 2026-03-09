@@ -34,7 +34,13 @@ start_service() {
 
     procd_open_instance
     procd_set_param command $PROG
-    [ -n "$thermal_file" ] && procd_append_param command -T "$thermal_file"
+    if [ -n "$thermal_file" ]; then
+        # Set thermal zone policy to user_space to take control of fan
+        local thermal_dir=$(dirname "$thermal_file")
+        local policy_file="$thermal_dir/policy"
+        [ -w "$policy_file" ] && echo "user_space" > "$policy_file"
+        procd_append_param command -T "$thermal_file"
+    fi
     [ -n "$fan_file" ] && procd_append_param command -F "$fan_file"
     [ -n "$start_temp" ] && procd_append_param command -t "$start_temp"
     [ -n "$start_speed" ] && procd_append_param command -s "$start_speed"
