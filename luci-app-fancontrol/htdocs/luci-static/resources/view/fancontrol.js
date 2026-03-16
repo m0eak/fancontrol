@@ -84,39 +84,35 @@ return view.extend({
         return Promise.all([uci.load('fancontrol')]);
     },
 
-    updateStatus: function() {
-        var thermal_file = uci.get('fancontrol', 'settings', 'thermal_file');
-        var fan_file = uci.get('fancontrol', 'settings', 'fan_file');
-        var temp_div = uci.get('fancontrol', 'settings', 'temp_div') || 1000;
-
-        var promises = [];
-        if (thermal_file) promises.push(L.resolveDefault(callReadFile(thermal_file), null));
-        if (fan_file) promises.push(L.resolveDefault(callReadFile(fan_file), null));
-
-        return Promise.all(promises).then(function (results) {
-            var temp_str = results[0];
-            var speed_str = results[1];
-
-            var temp_span = document.getElementById('status_temp');
-            if (temp_span) {
-                if (temp_str != null && temp_str.trim() !== '') {
-                    var temp = parseInt(temp_str, 10);
-                    temp_span.innerText = !isNaN(temp) ? (temp / temp_div).toFixed(1) + ' °C' : _('Invalid');
-                } else {
-                    temp_span.innerText = _('N/A');
+    updateStatus: function(thermal_file, fan_file, temp_div) {
+        // 分别独立更新，避免 Promise.all 产生的批量等待
+        if (thermal_file) {
+            L.resolveDefault(callReadFile(thermal_file), null).then(function(temp_str) {
+                var temp_span = document.getElementById('status_temp');
+                if (temp_span) {
+                    if (temp_str != null && temp_str.trim() !== '') {
+                        var temp = parseInt(temp_str, 10);
+                        temp_span.innerText = !isNaN(temp) ? (temp / temp_div).toFixed(1) + ' °C' : _('Invalid');
+                    } else {
+                        temp_span.innerText = _('N/A');
+                    }
                 }
-            }
+            });
+        }
 
-            var speed_span = document.getElementById('status_speed');
-            if (speed_span) {
-                if (speed_str != null && speed_str.trim() !== '') {
-                    var speed = parseInt(speed_str, 10);
-                    speed_span.innerText = !isNaN(speed) ? speed : _('Invalid');
-                } else {
-                    speed_span.innerText = _('N/A');
+        if (fan_file) {
+            L.resolveDefault(callReadFile(fan_file), null).then(function(speed_str) {
+                var speed_span = document.getElementById('status_speed');
+                if (speed_span) {
+                    if (speed_str != null && speed_str.trim() !== '') {
+                        var speed = parseInt(speed_str, 10);
+                        speed_span.innerText = !isNaN(speed) ? speed : _('Invalid');
+                    } else {
+                        speed_span.innerText = _('N/A');
+                    }
                 }
-            }
-        });
+            });
+        }
     },
 
     render: function (data) {
@@ -181,7 +177,12 @@ return view.extend({
         o = s.option(form.Value, 'hysteresis_temp', _('Hysteresis Temperature (°C)'));
         o.description = _('The fan will not stop until the temperature drops below (Start Temperature - Hysteresis).');
 
+        // Extract paths and values once from data to avoid repeated uci.get calls
+        var thermal_file = uci.get('fancontrol', 'settings', 'thermal_file');
+        var fan_file = uci.get('fancontrol', 'settings', 'fan_file');
+        var temp_div = uci.get('fancontrol', 'settings', 'temp_div') || 1000;
         var isEnabled = uci.get('fancontrol', 'settings', 'enabled') == '1';
+
         var enabled_span = container.querySelector('#status_enabled');
         if (enabled_span) {
             enabled_span.innerHTML = isEnabled
@@ -189,14 +190,15 @@ return view.extend({
                 : '<span style="color:red">' + _('Stopped') + '</span>';
         }
 
-        // Poll every 5 seconds
-        this.pollingTimer = setInterval(L.bind(this.updateStatus, this), 5000);
-
-        // Initial status update
-        this.updateStatus();
-
         return m.render().then(L.bind(function (map_rendered) {
             container.querySelector('.fan-form-container').appendChild(map_rendered);
+            
+            // Start polling and perform initial update *after* render completes
+            this.updateStatus(thermal_file, fan_file, temp_div);
+            this.pollingTimer = setInterval(L.bind(function() {
+                this.updateStatus(thermal_file, fan_file, temp_div);
+            }, this), 5000);
+
             return container;
         }, this));
     },
