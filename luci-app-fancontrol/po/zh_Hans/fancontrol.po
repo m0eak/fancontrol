@@ -54,3 +54,24 @@ msgstr "不可用"
 
 msgid "Fan General Control"
 msgstr "通用风扇控制小程序"
+
+msgid "The minimum speed level when the fan is running."
+msgstr "风扇运行时，风扇的最低速度等级。"
+
+msgid "The maximum speed level of the fan."
+msgstr "风扇的最大速度等级。"
+
+msgid "When the temperature reaches this value, the fan starts spinning."
+msgstr "当温度达到这个值时，风扇开始转动。"
+
+msgid "Max Temperature (°C)"
+msgstr "全速温度 (°C)"
+
+msgid "The temperature at which the fan should run at maximum speed."
+msgstr "当温度达到这个值时，风扇应全速运转。"
+
+msgid "Hysteresis Temperature (°C)"
+msgstr "回差温度 (°C)"
+
+msgid "The fan will not stop until the temperature drops below (Start Temperature - Hysteresis)."
+msgstr "只有当温度降至 (启动温度 - 回差温度) 以下时，风扇才会停止。"
