@@ -50,8 +50,9 @@ jobs:
           echo "CONFIG_PACKAGE_fancontrol=y" >> .config
           echo "CONFIG_PACKAGE_luci-app-fancontrol=y" >> .config
           make defconfig
-          make package/fancontrol-packages/fancontrol/compile V=s || echo "Fancontrol compile failed"
-          make package/fancontrol-packages/luci-app-fancontrol/compile V=s || echo "Luci app compile failed"
+          # 编译失败必须让本 step 失败：吞掉错误会让坏包照样走到 Release
+          make package/fancontrol-packages/fancontrol/compile V=s
+          make package/fancontrol-packages/luci-app-fancontrol/compile V=s
 
       - name: Organize Artifacts
         run: |
