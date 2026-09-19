@@ -4,6 +4,7 @@
 #include <unistd.h>  
 #include <sys/stat.h>  
 #include <signal.h>   
+#include <errno.h>  
   
 #define MAX_LENGTH 200  
 // 定义全局变量
@@ -228,8 +229,13 @@ int main(int argc ,char* argv[ ]) {
             
             // 仅当目标速度与上次设置的速度不同时才写入文件
             if (target_speed != last_set_speed) {
-                set_fanspeed(target_speed ,fan_file);
-                last_set_speed = target_speed;
+                // 写失败时绝不能更新 last_set_speed：否则目标值与记录值一致，后续循环永不重试
+                if (set_fanspeed(target_speed ,fan_file) > 0) {
+                    last_set_speed = target_speed;
+                } else {
+                    fprintf(stderr ,"Failed to write %s (target speed %d): %s\n" ,
+                        fan_file ,target_speed ,strerror(errno));
+                }
             }
         }
         
