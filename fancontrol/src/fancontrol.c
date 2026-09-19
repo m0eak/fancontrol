@@ -64,6 +64,15 @@ static size_t write_file(const char* path ,char* buf ,size_t len) {
  */  
 int get_temperature(char* thermal_file ,int div) {  
     char buf[8] = { 0 };  
+    static int warned_bad_div = 0;  
+    if (div <= 0) {  
+        // temp_div 来自 UCI，配成 0 会让下面的除法抛 SIGFPE；退化成按原始值处理，且只告警一次
+        if (!warned_bad_div) {  
+            fprintf(stderr ,"Invalid temp_div %d, fallback to 1\n" ,div);  
+            warned_bad_div = 1;  
+        }  
+        div = 1;  
+    }  
     if (read_file(thermal_file ,buf ,0) == 0) {  
         return atoi(buf) / div;  
     }  
@@ -95,6 +104,9 @@ int set_fanspeed(int fan_speed ,char* fan_file) {
  */  
 int calculate_speed(int current_temp ,int max_temp ,int min_temp ,int max_speed ,int min_speed) {  
     if (current_temp < min_temp) return min_speed; // 防止低温时算出负数
+
+    // 配置非法时直接给满速：max_temp == min_temp 会让下面的除法抛 SIGFPE 打崩守护进程
+    if (max_temp <= min_temp) return max_speed;
 
     int fan_speed = ( current_temp - min_temp ) * ( max_speed - min_speed ) / ( max_temp - min_temp ) + min_speed;  
     if (fan_speed > max_speed) {  
