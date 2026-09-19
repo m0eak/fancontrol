@@ -5,6 +5,7 @@
 #include <sys/stat.h>  
 #include <signal.h>   
 #include <errno.h>  
+#include <fcntl.h>  
   
 #define MAX_LENGTH 200  
 // 定义全局变量
@@ -46,16 +47,24 @@ static int read_file(const char* path ,char* result ,size_t size) {
 /**  
  * 底层写文件  
  */  
-static size_t write_file(const char* path ,char* buf ,size_t len) {  
-    FILE* fp = NULL;  
-    size_t size = 0;  
-    fp = fopen(path ,"w+");  
-    if (fp == NULL) {  
-        return 0;  
-    }  
-    size = fwrite(buf ,len ,1 ,fp);  
-    fclose(fp);  
-    return size;  
+static int write_file(const char* path ,const char* buf ,size_t len) {  
+    int fd;  
+    ssize_t written;  
+    int saved_errno;  
+
+    fd = open(path ,O_WRONLY);  
+    if (fd < 0)  
+        return -1;  
+
+    /* 刻意不用 stdio：fopen/fwrite 会先把内容写进用户态缓冲，真实的写错误要到  
+       fclose 的 flush 阶段才暴露；一旦忽略 fclose 的返回值，写失败就会被当成成功，  
+       于是 last_set_speed 被更新、后续永不重试，风扇卡死在错误档位 */  
+    written = write(fd ,buf ,len);  
+    saved_errno = errno;  
+    close(fd);  
+    errno = saved_errno;  
+
+    return written == (ssize_t)len ? (int)written : -1;  
 }  
   
 /**  
