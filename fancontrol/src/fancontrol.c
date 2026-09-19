@@ -24,24 +24,22 @@ int hysteresis_temp = 5;// -H
  */  
 static int read_file(const char* path ,char* result ,size_t size) {  
     FILE* fp;  
-    char* line = NULL;  
-    size_t len = 0;  
-    ssize_t read;  
+  
+    if (result == NULL || size == 0)  
+        return -1;  
   
     fp = fopen(path ,"r");  
     if (fp == NULL)  
         return -1;  
   
-    if (( read = getline(&line ,&len ,fp) ) != -1) {  
-        if (size != 0)  
-            memcpy(result ,line ,size);  
-        else  
-            memcpy(result ,line ,read - 1);  
+    result[0] = '\0';  
+    /* fgets 以 size 为硬上限，不会越界写入调用方缓冲区，且结果必定以 NUL 结尾 */  
+    if (fgets(result ,(int)size ,fp) != NULL) {  
+        /* sysfs 的值带换行，去掉行尾的 CR/LF */  
+        result[strcspn(result ,"\r\n")] = '\0';  
     }  
   
     fclose(fp);  
-    if (line)  
-        free(line);  
     return 0;  
 }  
   
@@ -64,7 +62,7 @@ static size_t write_file(const char* path ,char* buf ,size_t len) {
  * 读取温度  
  */  
 int get_temperature(char* thermal_file ,int div) {  
-    char buf[8] = { 0 };  
+    char buf[32] = { 0 };  
     static int warned_bad_div = 0;  
     if (div <= 0) {  
         // temp_div 来自 UCI，配成 0 会让下面的除法抛 SIGFPE；退化成按原始值处理，且只告警一次
@@ -74,7 +72,7 @@ int get_temperature(char* thermal_file ,int div) {
         }  
         div = 1;  
     }  
-    if (read_file(thermal_file ,buf ,0) == 0) {  
+    if (read_file(thermal_file ,buf ,sizeof(buf)) == 0) {  
         return atoi(buf) / div;  
     }  
     return -1;  
@@ -84,8 +82,8 @@ int get_temperature(char* thermal_file ,int div) {
  * 读取风扇速度  
  */  
 int get_fanspeed(char* fan_file) {  
-    char buf[8] = { 0 };  
-    if (read_file(fan_file ,buf ,0) == 0) {  
+    char buf[32] = { 0 };  
+    if (read_file(fan_file ,buf ,sizeof(buf)) == 0) {  
         return atoi(buf);  
     }  
     return 0; // 读取失败默认当0处理
