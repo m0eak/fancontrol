@@ -78,19 +78,26 @@ static int write_file(const char* path ,const char* buf ,size_t len) {
  *  
  * 用 strtol 而不是 atoi：atoi 溢出属于 UB，超长数字串会解析出垃圾值（甚至负数）。  
  * 非数字或超出 long 范围时返回 fallback；超出 int 范围则夹到边界。  
+ *  
+ * 注意：尾部残留字符会被静默忽略（取最长合法前缀），"12abc" 会解析成 12。当前调用方  
+ * 都是 sysfs 读数（行尾已在 read_file 里去掉了），因此走不到这种情况。  
  */  
 static int parse_int(const char* buf ,int fallback) {  
     char* end = NULL;  
     long value;  
-  
+    int saved_errno = errno;  
+
     errno = 0;  
     value = strtol(buf ,&end ,10);  
     if (end == buf || errno == ERANGE)  
-        return fallback;  
-    if (value > INT_MAX)  
-        return INT_MAX;  
-    if (value < INT_MIN)  
-        return INT_MIN;  
+        value = fallback;  
+    else if (value > INT_MAX)  
+        value = INT_MAX;  
+    else if (value < INT_MIN)  
+        value = INT_MIN;  
+  
+    /* 对 errno 保持透明：主循环靠 errno 诊断写失败，不能被这里的 strtol 抹掉 */  
+    errno = saved_errno;  
     return (int)value;  
 }  
   
