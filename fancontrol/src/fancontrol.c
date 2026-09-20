@@ -6,6 +6,7 @@
 #include <signal.h>   
 #include <errno.h>  
 #include <fcntl.h>  
+#include <limits.h>  
   
 #define MAX_LENGTH 200  
 // 定义全局变量
@@ -46,6 +47,9 @@ static int read_file(const char* path ,char* result ,size_t size) {
   
 /**  
  * 底层写文件  
+ *  
+ * 契约：目标限定 sysfs 属性文件——单次 write 即完成，不存在部分写或延迟写语义。  
+ * 成功返回写入的字节数（>0）；失败返回 -1，且 errno 被置为 write() 的错误。  
  */  
 static int write_file(const char* path ,const char* buf ,size_t len) {  
     int fd;  
@@ -62,9 +66,32 @@ static int write_file(const char* path ,const char* buf ,size_t len) {
     written = write(fd ,buf ,len);  
     saved_errno = errno;  
     close(fd);  
+    if (written != (ssize_t)len && saved_errno == 0)  
+        saved_errno = EIO; // 短写且内核没置 errno：不能让它冒充成功  
     errno = saved_errno;  
 
     return written == (ssize_t)len ? (int)written : -1;  
+}  
+  
+/**  
+ * 把缓冲区内容解析成整数  
+ *  
+ * 用 strtol 而不是 atoi：atoi 溢出属于 UB，超长数字串会解析出垃圾值（甚至负数）。  
+ * 非数字或超出 long 范围时返回 fallback；超出 int 范围则夹到边界。  
+ */  
+static int parse_int(const char* buf ,int fallback) {  
+    char* end = NULL;  
+    long value;  
+  
+    errno = 0;  
+    value = strtol(buf ,&end ,10);  
+    if (end == buf || errno == ERANGE)  
+        return fallback;  
+    if (value > INT_MAX)  
+        return INT_MAX;  
+    if (value < INT_MIN)  
+        return INT_MIN;  
+    return (int)value;  
 }  
   
 /**  
@@ -82,7 +109,10 @@ int get_temperature(char* thermal_file ,int div) {
         div = 1;  
     }  
     if (read_file(thermal_file ,buf ,sizeof(buf)) == 0) {  
-        return atoi(buf) / div;  
+        int raw = parse_int(buf ,-1);  
+        if (raw < 0)  
+            return -1;  
+        return raw / div;  
     }  
     return -1;  
 }  
@@ -93,7 +123,8 @@ int get_temperature(char* thermal_file ,int div) {
 int get_fanspeed(char* fan_file) {  
     char buf[32] = { 0 };  
     if (read_file(fan_file ,buf ,sizeof(buf)) == 0) {  
-        return atoi(buf);  
+        int level = parse_int(buf ,0);  
+        return level > 0 ? level : 0;  
     }  
     return 0; // 读取失败默认当0处理
 }  
@@ -102,8 +133,8 @@ int get_fanspeed(char* fan_file) {
  * 设置风扇转速  
  */  
 int set_fanspeed(int fan_speed ,char* fan_file) {  
-    char buf[8] = { 0 };  
-    sprintf(buf ,"%d\n" ,fan_speed);  
+    char buf[32] = { 0 };  
+    snprintf(buf ,sizeof(buf) ,"%d\n" ,fan_speed);  
     return write_file(fan_file ,buf ,strlen(buf));  
 }  
   
@@ -135,6 +166,7 @@ static int file_exist(const char* name) {
  *  信号处理函数  
  */  
 void handle_termination(int signum) {  
+    (void)signum; // 参数未使用：显式标注，避免 -Wextra 警告  
     // 设置风扇转速为 0  
     set_fanspeed(0 ,fan_file);  
     exit(EXIT_SUCCESS); // 优雅地退出程序  
