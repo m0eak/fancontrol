@@ -63,6 +63,7 @@ static int write_file(const char* path ,const char* buf ,size_t len) {
     /* 刻意不用 stdio：fopen/fwrite 会先把内容写进用户态缓冲，真实的写错误要到  
        fclose 的 flush 阶段才暴露；一旦忽略 fclose 的返回值，写失败就会被当成成功，  
        于是 last_set_speed 被更新、后续永不重试，风扇卡死在错误档位 */  
+
     /* sysfs 单次写即完成；信号可能打断 write()，EINTR 应重试而不是当成失败。  
        注意本程序注册的 SIGTERM / SIGINT 处理器会直接 exit()，真正能产生 EINTR 的是其他信号 */  
     do {  
