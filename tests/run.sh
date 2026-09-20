@@ -47,6 +47,7 @@ echo "== Translation catalog is valid and covers every string =="
 msgfmt --check -o /dev/null "$po"
 python3 - "$view" "$po" <<'PY'
 import re, sys
+# 约定：view 里的可翻译字符串一律写单引号（`_('...')`），这里按该约定提取
 js = open(sys.argv[1], encoding="utf-8").read()
 po = open(sys.argv[2], encoding="utf-8").read()
 used = set(re.findall(r"_\(\s*'((?:[^'\\]|\\.)*)'\s*\)", js))

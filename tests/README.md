@@ -11,8 +11,8 @@
 | 检查 | 覆盖的内容 |
 |---|---|
 | `tests/c/fancontrol_test.c` | 守护进程的取值、解析与写路径。**必须用 ASan 构建**，否则越界那几项失去意义 |
-| LuCI view 语法 | `fancontrol.js` 能否被解析（LuCI view 顶层有 `return`，所以包进函数里解析，`node --check` 会误报） |
-| ACL / menu JSON | 三个 JSON 文件是否合法 |
+| LuCI view 语法 | `fancontrol.js` 能否被解析。包进 `new Function` 是为了复现 LuCI 的包装语义（view 顶层有 `return`） |
+| ACL / menu JSON | `luci-app-fancontrol` 下所有 JSON 文件是否合法 |
 | 翻译覆盖率 | `fancontrol.js` 里每个 `_()` 字符串在 `zh_Hans` 目录里都有译文，且目录本身通过 `msgfmt --check` |
 
 ## 为什么守护进程的测试要 `#include` 源码

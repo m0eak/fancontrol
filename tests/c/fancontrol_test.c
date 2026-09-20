@@ -58,7 +58,10 @@ int main(void)
 	struct stat sb;
 
 	snprintf(dir, sizeof(dir), "/tmp/fancontrol-test-%d", (int)getpid());
-	mkdir(dir, 0700);
+	if (mkdir(dir, 0700) != 0 && errno != EEXIST) {
+		printf("FAIL   could not create %s\n", dir);
+		return 1;
+	}
 	snprintf(file, sizeof(file), "%s/value", dir);
 	snprintf(sensor, sizeof(sensor), "%s/temp", dir);
 	snprintf(fan, sizeof(fan), "%s/fan", dir);
@@ -88,7 +91,7 @@ int main(void)
 	 */
 	write_digits(file, 120);
 	eq("get_temperature rejects an overlong value", get_temperature(file, 1000), -1);
-	eq("get_fanspeed never reports a negative level", get_fanspeed(file) >= 0, 1);
+	eq("get_fanspeed rejects an overlong value", get_fanspeed(file), 0);
 
 	/*
 	 * Fan level.
@@ -97,7 +100,7 @@ int main(void)
 	eq("get_fanspeed reads a level", get_fanspeed(fan), 117);
 
 	write_text(fan, "999999999999999999999999999999999999\n");
-	eq("get_fanspeed clamps an unparseable level", get_fanspeed(fan) >= 0, 1);
+	eq("get_fanspeed rejects an unparseable level", get_fanspeed(fan), 0);
 
 	/*
 	 * parse_int. atoi's overflow is undefined; strtol plus fallback replaces it.
@@ -164,5 +167,11 @@ int main(void)
 		printf("skip   write_file on a full device -- /dev/full unavailable\n");
 
 	printf("\n%s: %d check(s) failed\n", failed ? "FAIL" : "PASS", failed);
+
+	unlink(file);
+	unlink(sensor);
+	unlink(fan);
+	rmdir(dir);
+
 	return failed ? 1 : 0;
 }
