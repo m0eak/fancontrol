@@ -14,6 +14,7 @@ start_service() {
     config_get enabled settings enabled
     [ "$enabled" = "1" ] || { _info "Instance \"$NAME\" disabled."; return 1; }
 
+    local debug
     local thermal_file
     local fan_file
     local start_temp
@@ -24,6 +25,7 @@ start_service() {
     local hysteresis_temp
 
     config_get thermal_file settings thermal_file
+    config_get debug settings debug
     config_get fan_file settings fan_file
     config_get start_temp settings start_temp
     config_get start_speed settings start_speed
@@ -48,6 +50,8 @@ start_service() {
     [ -n "$temp_div" ] && procd_append_param command -d "$temp_div"
     [ -n "$max_temp" ] && procd_append_param command -M "$max_temp"
     [ -n "$hysteresis_temp" ] && procd_append_param command -H "$hysteresis_temp"
+    # C 侧 debug_mode 默认为 0；只有这里显式传 -D 1 才会打开逐轮调试输出
+    [ "$debug" = "1" ] && procd_append_param command -D 1
     # The daemon reports its diagnostics on stderr (failed writes, invalid temp_div).
     # procd does not forward a child's stderr to syslog unless asked, so without these
     # lines those messages are discarded in production.

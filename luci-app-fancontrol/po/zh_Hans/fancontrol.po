@@ -90,6 +90,12 @@ msgstr "回差温度 (°C)"
 msgid "Unknown"
 msgstr "未知"
 
+msgid "Debug Logging"
+msgstr "调试日志"
+
+msgid "Log the temperature and target speed to syslog on every poll."
+msgstr "每次轮询都把温度与目标转速写入 syslog。"
+
 msgid "Temperature Divisor"
 msgstr "温度除数"
 

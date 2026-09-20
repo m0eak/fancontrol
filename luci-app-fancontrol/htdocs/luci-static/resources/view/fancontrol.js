@@ -221,6 +221,9 @@ return view.extend({
         o = s.option(form.Value, 'hysteresis_temp', _('Hysteresis Temperature (°C)'));
         o.description = _('The fan will not stop until the temperature drops below (Start Temperature - Hysteresis).');
 
+        o = s.option(form.Flag, 'debug', _('Debug Logging'));
+        o.description = _('Log the temperature and target speed to syslog on every poll.');
+
         // Extract paths and values once from data to avoid repeated uci.get calls
         var thermal_file = uci.get('fancontrol', 'settings', 'thermal_file');
         var fan_file = uci.get('fancontrol', 'settings', 'fan_file');
