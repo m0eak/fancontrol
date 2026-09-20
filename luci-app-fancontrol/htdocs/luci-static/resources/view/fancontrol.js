@@ -87,10 +87,14 @@ return view.extend({
     updateStatus: function(thermal_file, fan_file, temp_div) {
         // 分别独立更新，避免 Promise.all 产生的批量等待
         if (thermal_file) {
-            L.resolveDefault(callReadFile(thermal_file), null).then(function(temp_str) {
+            // 不用 L.resolveDefault 把错误吞成 null：RPC 被拒绝必须和「读到空内容」区分开
+            L.resolveDefault(callReadFile(thermal_file), false).then(function(temp_str) {
                 var temp_span = document.getElementById('status_temp');
                 if (temp_span) {
-                    if (temp_str != null && temp_str.trim() !== '') {
+                    if (temp_str === false) {
+                        temp_span.innerText = _('Read failed');
+                        temp_span.title = _('Check that the path exists and is allowed by the ACL.');
+                    } else if (temp_str != null && temp_str.trim() !== '') {
                         var temp = parseInt(temp_str, 10);
                         temp_span.innerText = !isNaN(temp) ? (temp / temp_div).toFixed(1) + ' °C' : _('Invalid');
                     } else {
@@ -101,10 +105,13 @@ return view.extend({
         }
 
         if (fan_file) {
-            L.resolveDefault(callReadFile(fan_file), null).then(function(speed_str) {
+            L.resolveDefault(callReadFile(fan_file), false).then(function(speed_str) {
                 var speed_span = document.getElementById('status_speed');
                 if (speed_span) {
-                    if (speed_str != null && speed_str.trim() !== '') {
+                    if (speed_str === false) {
+                        speed_span.innerText = _('Read failed');
+                        speed_span.title = _('Check that the path exists and is allowed by the ACL.');
+                    } else if (speed_str != null && speed_str.trim() !== '') {
                         var speed = parseInt(speed_str, 10);
                         speed_span.innerText = !isNaN(speed) ? speed : _('Invalid');
                     } else {
@@ -180,14 +187,17 @@ return view.extend({
         // Extract paths and values once from data to avoid repeated uci.get calls
         var thermal_file = uci.get('fancontrol', 'settings', 'thermal_file');
         var fan_file = uci.get('fancontrol', 'settings', 'fan_file');
-        var temp_div = uci.get('fancontrol', 'settings', 'temp_div') || 1000;
+        // 必须用 parseInt：uci.get 返回的是字符串，"0" 在 JS 里是真值，会算出 Infinity °C
+        var temp_div = parseInt(uci.get('fancontrol', 'settings', 'temp_div'), 10) || 1000;
         var isEnabled = uci.get('fancontrol', 'settings', 'enabled') == '1';
 
         var enabled_span = container.querySelector('#status_enabled');
         if (enabled_span) {
-            enabled_span.innerHTML = isEnabled
-                ? '<span style="color:green">' + _('Running') + '</span>'
-                : '<span style="color:red">' + _('Stopped') + '</span>';
+            // 用主题的语义类，而不是写死 color:green/red，暗色主题下才有一致的对比度
+            enabled_span.textContent = '';
+            enabled_span.appendChild(E('span', {
+                'class': 'label ' + (isEnabled ? 'success' : 'danger')
+            }, isEnabled ? _('Running') : _('Stopped')));
         }
 
         return m.render().then(L.bind(function (map_rendered) {
