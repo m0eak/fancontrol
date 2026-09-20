@@ -18,6 +18,15 @@ Openwrt简易通用风扇控制，最早是给GL-AXT1800使用，原理是读取
     ./scripts/feeds clean && ./scripts/feeds update -a && ./scripts/feeds install -a
     ```
 
+## 预编译包
+
+推送到 `main` 会由 GitHub Actions 自动编译并发布到 Releases：
+
+- `fancontrol`（守护进程）是编译出来的二进制，**只适用于 `qualcommax/ipq60xx`**。
+  其他平台请按上面的 feed 方式自行编译。
+- `luci-app-fancontrol` 标记为 `PKGARCH:=all`，`luci-i18n-fancontrol-*` 同样只含翻译数据，
+  两者都不绑架构。
+
 ## 功能特性
 - **线性调速**：根据设定的温度区间，自动线性调节风扇转速。
 - **回差控制**：防止风扇在临界温度点频繁启停，延长风扇寿命。
