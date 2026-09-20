@@ -51,18 +51,25 @@ jobs:
           TARGET="qualcommax/ipq60xx"
           # 目录里的 SDK 文件名嵌着工具链版本（gcc-14.3.0 之类），不要自己拼；从该 release
           # 自己的 sha256sums 里把它找出来，顺便拿到哈希用于校验下载内容是否完整。
+          verified=0
           for base in \
-            "https://immortalwrt.kyarucloud.moe/releases/${VERSION}/targets/${TARGET}" \
-            "https://downloads.immortalwrt.org/releases/${VERSION}/targets/${TARGET}"; do
+            "${SDK_BASE_MIRROR:-https://immortalwrt.kyarucloud.moe/releases}/${VERSION}/targets/${TARGET}" \
+            "${SDK_BASE_OFFICIAL:-https://downloads.immortalwrt.org/releases}/${VERSION}/targets/${TARGET}"; do
             rm -f sha256sums sdk.tar.zst
             if ! wget -q -O sha256sums "$base/sha256sums"; then
               echo "No checksum list at $base"
               continue
             fi
-            file=$(grep -oE 'immortalwrt-sdk-[^ ]*Linux-x86_64\.tar\.zst' sha256sums | head -1)
-            want=$(grep -F "$file" sha256sums | awk '{print $1}' | head -1)
-            if [ -z "$file" ] || [ -z "$want" ]; then
+            # 命令替换必须带 || true：Actions 的默认 shell 是 bash -eo pipefail，
+            # grep 无匹配会让整个替换失败、set -e 当场终止 step，下面的守卫就永远走不到
+            file=$(grep -oE 'immortalwrt-sdk-[^ ]*Linux-x86_64\.tar\.zst' sha256sums | head -1 || true)
+            if [ -z "$file" ]; then
               echo "No SDK entry in the checksum list at $base"
+              continue
+            fi
+            want=$(grep -F "$file" sha256sums | awk '{print $1}' | head -1 || true)
+            if [ -z "$want" ]; then
+              echo "No digest for $file at $base"
               continue
             fi
             if ! wget -q -O sdk.tar.zst "$base/$file"; then
@@ -72,12 +79,15 @@ jobs:
             # wget 对 HTTP 200 的错误页同样返回成功，只有哈希能证明拿到的是想要的文件
             if ! echo "$want  sdk.tar.zst" | sha256sum -c -; then
               echo "Checksum mismatch from $base"
+              rm -f sdk.tar.zst
               continue
             fi
-            echo "SDK $file verified, fetching from $base"
+            echo "SDK $file verified, fetched from $base"
+            verified=1
             break
           done
-          test -s sdk.tar.zst || { echo "Could not obtain a verified SDK" >&2; exit 1; }
+          # 判据是「校验通过」而不是「文件非空」：最后一个源校验失败时坏文件仍可能留在盘上
+          [ "$verified" = 1 ] || { echo "Could not obtain a verified SDK" >&2; exit 1; }
           tar --zstd -xf sdk.tar.zst
           mv immortalwrt-sdk-* sdk
 
