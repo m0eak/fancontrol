@@ -87,6 +87,9 @@ msgstr "当温度达到这个值时，风扇应全速运转。"
 msgid "Hysteresis Temperature (°C)"
 msgstr "回差温度 (°C)"
 
+msgid "Must be a positive integer."
+msgstr "必须是正整数。"
+
 msgid "Unknown"
 msgstr "未知"
 
