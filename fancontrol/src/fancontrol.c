@@ -190,7 +190,7 @@ void register_signal_handlers( ) {
 int main(int argc ,char* argv[ ]) {  
     // 解析命令行选项  
     int opt;  
-    while (( opt = getopt(argc ,argv ,"T:F:s:t:m:d:D:v:M:H:") ) != -1) {
+    while (( opt = getopt(argc ,argv ,"T:F:s:t:m:d:D:M:H:") ) != -1) {
         switch (opt) {  
             case 'T':  
                 snprintf(thermal_file ,sizeof(thermal_file) ,"%s" ,optarg);  
