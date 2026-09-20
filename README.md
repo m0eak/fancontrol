@@ -38,5 +38,17 @@ Openwrt简易通用风扇控制，最早是给GL-AXT1800使用，原理是读取
 | `hysteresis_temp` | `5` | 回差温度 (°C)，风扇启动后，需要温度降至 `(启动温度 - 回差温度)` 以下才会停止。 |
 | `temp_div` | `1000` | 温度值的分母，用于将原始温度值转换为摄氏度 (例如，如果原始值是 `45000`，除以 `1000` 后得到 `45`°C)。 |
 
+## 状态面板的读取范围
+
+状态面板通过 rpcd 读取 `thermal_file` 与 `fan_file`，而 rpcd 的白名单只覆盖这四种路径：
+
+- `/sys/class/thermal/thermal_zone*/temp`
+- `/sys/class/thermal/cooling_device*/cur_state`
+- `/sys/devices/virtual/thermal/thermal_zone*/temp`
+- `/sys/devices/virtual/thermal/cooling_device*/cur_state`
+
+把这两个选项指向白名单以外的路径时，守护进程本身仍能正常工作（它以 root 直接读写 sysfs），
+但状态面板会显示 `Read failed`，鼠标悬停提示会指向本应用的 ACL 白名单。
+
 ## 预览
 ![图片](./images/1.png)

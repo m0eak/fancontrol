@@ -6,10 +6,16 @@
 				"fancontrol"
 			],
 			"file": {
-				"/sys/devices/virtual/thermal/*/*": [
+				"/sys/class/thermal/cooling_device*/cur_state": [
 					"read"
 				],
-				"/sys/class/thermal/*/*": [
+				"/sys/class/thermal/thermal_zone*/temp": [
+					"read"
+				],
+				"/sys/devices/virtual/thermal/cooling_device*/cur_state": [
+					"read"
+				],
+				"/sys/devices/virtual/thermal/thermal_zone*/temp": [
 					"read"
 				]
 			}
