@@ -48,22 +48,18 @@ start_service() {
     [ -n "$temp_div" ] && procd_append_param command -d "$temp_div"
     [ -n "$max_temp" ] && procd_append_param command -M "$max_temp"
     [ -n "$hysteresis_temp" ] && procd_append_param command -H "$hysteresis_temp"
+    # The daemon reports its diagnostics on stderr (failed writes, invalid temp_div).
+    # procd does not forward a child's stderr to syslog unless asked, so without these
+    # lines those messages are discarded in production.
+    procd_set_param stdout 1
+    procd_set_param stderr 1
     procd_set_param respawn
     procd_close_instance
 }
 
-start() {
-    start_service
-}
-
-stop() {
-    procd_kill_instance
-}
-
-reload() {
-    procd_reload_instance
-}
-
+# No start()/stop()/reload() wrappers here: rc.common sources this script and then
+# redefines all three inside its USE_PROCD block, so local definitions are silently
+# shadowed. procd_kill_instance and procd_reload_instance are not part of procd's API.
 service_triggers() {
     procd_add_reload_trigger "fancontrol"
 }
