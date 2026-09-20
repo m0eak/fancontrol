@@ -205,6 +205,9 @@ void register_signal_handlers( ) {
 int main(int argc ,char* argv[ ]) {  
     // 解析命令行选项  
     int opt;  
+    /* procd 把 stdout 接到 syslog 时它不是 tty，默认全缓冲会让 -D 的逐轮日志积压数分钟才刷出；  
+       stdout 在这个程序里只用作日志流，行缓冲才符合预期 */  
+    setvbuf(stdout ,NULL ,_IOLBF ,0);  
     while (( opt = getopt(argc ,argv ,"T:F:s:t:m:d:D:M:H:") ) != -1) {
         switch (opt) {  
             case 'T':  
