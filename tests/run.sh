@@ -26,7 +26,7 @@ echo "== C regression tests (ASan + UBSan) =="
 echo
 echo "== LuCI view parses as JavaScript =="
 # The view uses a top-level return, which LuCI wraps in a function, so it is
-# parsed inside one here as well; node --check would reject it.
+# parsed inside one here as well to reproduce LuCI's wrapping semantics.
 node -e 'new Function(require("fs").readFileSync(process.argv[1], "utf8"));' "$view"
 echo "ok"
 
