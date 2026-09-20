@@ -38,6 +38,8 @@ Openwrt简易通用风扇控制，最早是给GL-AXT1800使用，原理是读取
 
 | 选项 | 默认值 | 说明 |
 |---|---|---|
+| `enabled` | `0` | 是否启用服务。 |
+| `debug` | `0` | 设为 `1` 时守护进程每次轮询向 syslog 写一条调试记录，用于排查问题。 |
 | `thermal_file` | `/sys/devices/virtual/thermal/thermal_zone0/temp` | 温度传感器的虚拟文件路径。 |
 | `fan_file` | `/sys/devices/virtual/thermal/cooling_device0/cur_state` | 风扇转速控制的虚拟文件路径。 |
 | `start_speed` | `35` | 风扇启动时的最低转速等级。 |
@@ -51,6 +53,9 @@ Openwrt简易通用风扇控制，最早是给GL-AXT1800使用，原理是读取
 
 把 `debug` 设为 `1`（或在 LuCI 页面勾选「调试日志」）后，守护进程每次轮询都会把温度、状态与
 目标转速写入 syslog，用 `logread` 查看。该选项默认关闭：它每 5 秒产生一条记录，长期开启会刷日志。
+
+改完该选项需要重载服务才会生效（在 LuCI 保存会自动触发；手改 `/etc/config/fancontrol` 时需
+手动执行 `/etc/init.d/fancontrol reload`）。
 
 ## 状态面板的读取范围
 
