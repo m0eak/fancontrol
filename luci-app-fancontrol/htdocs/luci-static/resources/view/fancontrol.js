@@ -132,8 +132,8 @@ return view.extend({
         }
     },
 
-    updateServiceState: function (enabled_span) {
-        if (!enabled_span)
+    updateServiceState: function (status_span) {
+        if (!status_span)
             return;
 
         // 查 procd 里实例的真实运行状态，而不是 UCI 的 enabled 开关：
@@ -145,14 +145,14 @@ return view.extend({
             });
 
             // 用主题的语义类，而不是写死 color:green/red，暗色主题下才有一致的对比度
-            enabled_span.textContent = '';
-            enabled_span.appendChild(E('span', {
+            status_span.textContent = '';
+            status_span.appendChild(E('span', {
                 'class': 'label ' + (running ? 'success' : 'danger')
             }, running ? _('Running') : _('Stopped')));
         }).catch(function () {
             // 权限不足或 ubus 不可用时如实显示未知，不要退回配置开关冒充运行状态
-            enabled_span.textContent = '';
-            enabled_span.appendChild(E('span', { 'class': 'label' }, _('Unknown')));
+            status_span.textContent = '';
+            status_span.appendChild(E('span', { 'class': 'label' }, _('Unknown')));
         });
     },
 
@@ -241,6 +241,9 @@ return view.extend({
                 this.updateServiceState(document.getElementById('status_enabled'));
             }, this), 5000);
             // 切回页面时立刻补一次，不必等下一个 5 秒周期
+            // 先摘掉可能残留的旧监听器：render 若被重入，旧引用会丢失而永远摘不掉
+            if (this.visibilityHandler)
+                document.removeEventListener('visibilitychange', this.visibilityHandler);
             this.visibilityHandler = L.bind(function() {
                 if (!document.hidden) {
                     this.updateStatus(thermal_file, fan_file, temp_div);
