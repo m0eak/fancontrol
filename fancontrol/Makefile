@@ -2,7 +2,7 @@ include $(TOPDIR)/rules.mk
 
 PKG_NAME:=fancontrol
 PKG_VERSION:=1
-PKG_RELEASE:=4
+PKG_RELEASE:=5
 
 
 PKG_LICENSE:=MIT
@@ -10,6 +10,10 @@ PKG_LICENSE_FILES:=LICENSE
 PKG_MAINTAINER:=JiaY-shi <shi05275@163.com>
 
 PKG_BUILD_PARALLEL:=1
+
+# package.mk passes CFLAGS on the command line, which overrides the -Wall -Wextra in
+# src/Makefile. Add them here as well so warnings actually reach the build log and CI.
+EXTRA_CFLAGS += -Wall -Wextra
 
 include $(INCLUDE_DIR)/package.mk
 
