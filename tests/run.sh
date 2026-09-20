@@ -35,6 +35,26 @@ node -e 'new Function(require("fs").readFileSync(process.argv[1], "utf8"));' "$v
 echo "ok"
 
 echo
+echo "== Inline CSS references no undefined custom properties =="
+# 温度带就是这样整条渐变失效的：引用了四个从未定义的 --fc-* 。
+# 这里把「CSS 里定义的」与「view 用 setProperty 设的」合并后再比对。
+python3 - "$view" <<'CSSCHECK'
+import re, sys
+src = open(sys.argv[1], encoding="utf-8").read()
+m = re.search(r"var css = `(.*?)`;", src, re.S)
+if not m:
+    raise SystemExit("could not find the inline css block")
+css = m.group(1)
+defined = set(re.findall(r"(--[a-z0-9-]+)\s*:", css))
+defined |= set(re.findall(r"setProperty\('(--[a-z0-9-]+)'", src))
+used = set(re.findall(r"var\((--[a-z0-9-]+)", css))
+missing = sorted(used - defined)
+if missing:
+    raise SystemExit("undefined custom properties: " + ", ".join(missing))
+print("ok   %d custom properties, all accounted for" % len(used))
+CSSCHECK
+
+echo
 echo "== ACL and menu files parse as JSON =="
 python3 - "$root" <<'PY'
 import glob, json, sys

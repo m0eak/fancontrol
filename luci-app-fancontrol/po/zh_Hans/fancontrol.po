@@ -141,8 +141,14 @@ msgstr "启动"
 msgid "Stop"
 msgstr "停机"
 
+msgid "Temperature Band: %s"
+msgstr "温度带：%s"
+
+msgid "Temperature Band: %s °C, %s, stop %s °C, start %s °C, max %s °C"
+msgstr "温度带：%s °C，%s，停机 %s °C，启动 %s °C，满速 %s °C"
+
 msgid "Temperature Band"
-msgstr "温度区间"
+msgstr "温度带"
 
 msgid "Temperature Divisor"
 msgstr "温度除数"

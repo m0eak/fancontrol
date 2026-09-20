@@ -82,6 +82,9 @@ eq('int_or 对非数字回退', helpers.int_or('abc', 7), 7);
 eq('int_or 对空串回退', helpers.int_or('', 7), 7);
 eq('int_or 截到整数部分', helpers.int_or('1000.9', 7), 1000);
 eq('int_or 正常取值', helpers.int_or('1000', 7), 1000);
+eq('int_or 不做 || 兜底（那是 read_config 的职责）', helpers.int_or('0', 1000), 0);
+eq('非法配置下区间判定仍然确定（max == start 时 44 度算回滞区）',
+   helpers.band_zone({ start_temp: 45, max_temp: 45, hysteresis_temp: 5 }, 44), 'hold');
 
 console.log('\n' + (failed ? 'FAIL: ' + failed + ' 项不符' : 'PASS: 全部通过'));
 process.exit(failed ? 1 : 0);

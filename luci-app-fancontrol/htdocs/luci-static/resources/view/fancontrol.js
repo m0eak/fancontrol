@@ -132,10 +132,13 @@ var css = `
         background: currentColor;
     }
 
-    .fc-badge.is-ok { color: #2f7d4f; }
-    .fc-badge.is-warn { color: #b8860b; }
+    /* 取中明度，浅底深底都过得了 3:1。刻意不跟 prefers-color-scheme 走：
+       LuCI 主题的暗色是切 class，不响应系统媒体查询，跟着它走会让
+       「系统浅色 + 主题深色」的用户拿到偏暗的绿。 */
+    .fc-badge.is-ok { color: #3f9168; }
+    .fc-badge.is-warn { color: #c2912b; }
     .fc-badge.is-off { opacity: 0.55; }
-    .fc-badge.is-err { color: #b3382a; }
+    .fc-badge.is-err { color: #c04a33; }
 
     /* 温度带 —— 全页唯一的识别点 */
     .fc-band { margin-top: 20px; }
@@ -148,6 +151,14 @@ var css = `
     }
 
     .fc-track {
+        /* 温度带是全页唯一带色彩的元件：这里的颜色是「冷 → 热」的语义，不是装饰。
+           定义在 .fc-track 上，游标作为子元素自动继承。缺了它们整条渐变都算非法，
+           带子会退化成空的圆角框。 */
+        --fc-cold: rgba(127, 127, 127, 0.22);
+        --fc-hold: #c9922c;
+        --fc-warm: #d8832f;
+        --fc-hot: #bf3f28;
+
         position: relative;
         height: 14px;
         border-radius: 999px;
@@ -158,6 +169,14 @@ var css = `
             var(--fc-hot) var(--p-max),
             var(--fc-hot) var(--p-max) 100%);
         box-shadow: inset 0 0 0 1px rgba(127, 127, 127, 0.35);
+    }
+
+    @media (prefers-color-scheme: dark) {
+        .fc-track {
+            --fc-hold: #dcab48;
+            --fc-warm: #e39144;
+            --fc-hot: #e2684c;
+        }
     }
 
     .fc-band.is-unknown .fc-track { filter: saturate(0.2); opacity: 0.55; }
@@ -222,12 +241,6 @@ var css = `
 
     .fc-flash { animation: fc-flash 0.5s ease-out; border-radius: 6px; }
 
-    @media (prefers-color-scheme: dark) {
-        .fc-badge.is-ok { color: #4fb079; }
-        .fc-badge.is-warn { color: #d8a63f; }
-        .fc-badge.is-err { color: #e2684c; }
-    }
-
     @media (prefers-reduced-motion: reduce) {
         .fc-marker { transition: none; }
         .fc-flash { animation: none; }
@@ -243,6 +256,7 @@ var css = `
 return view.extend({
     pollingTimer: null,
     visibilityHandler: null,
+    scale_key: null,
 
     load: function () {
         return Promise.all([uci.load('fancontrol')]);
@@ -282,6 +296,13 @@ return view.extend({
         if (!track)
             return;
 
+        // 配置没变就不重画：每轮重设一遍 CSS 变量只会白白触发重绘
+        var key = cfg.start_temp + '/' + cfg.max_temp + '/' + cfg.hysteresis_temp;
+        if (this.scale_key === key)
+            return;
+
+        this.scale_key = key;
+
         var geo = band_geometry(cfg);
 
         track.style.setProperty('--p-stop', geo.pct(geo.stop) + '%');
@@ -303,7 +324,8 @@ return view.extend({
     },
 
     // 只负责读数：游标位置、区间文案、整条带子的无障碍描述
-    render_band_reading: function (cfg, temp, known) {
+    // reason: 'ok' | 'read-failed' | 'invalid' | 'empty'
+    render_band_reading: function (cfg, temp, reason) {
         var band = document.getElementById('fc_band');
         var marker = document.getElementById('fc_marker');
         var state = document.getElementById('fc_band_state');
@@ -311,13 +333,24 @@ return view.extend({
         if (!band || !marker || !state)
             return;
 
+        var known = (reason === 'ok');
+
         band.classList.toggle('is-unknown', !known);
 
         if (!known) {
-            // 读不到温度时把原因写在带子下面，而不是只塞进 title
-            // （触屏和键盘都拿不到 title）
-            state.textContent = _('Check that the path exists and is allowed by the ACL.');
-            band.setAttribute('aria-label', _('Temperature Band') + ': ' + _('Read failed'));
+            // 三种失败要分开说：被 ACL 拒绝要去看白名单，内容非法或文件为空是另一回事。
+            // 统一报「读取失败」会把人引向错误的方向。
+            var label = {
+                'read-failed': _('Read failed'),
+                'invalid': _('Invalid'),
+                'empty': _('N/A')
+            }[reason] || _('Read failed');
+
+            // 原因写在带子下面，而不是只塞进 title（触屏和键盘都拿不到 title）
+            state.textContent = (reason === 'read-failed')
+                ? _('Check that the path exists and is allowed by the ACL.')
+                : label;
+            band.setAttribute('aria-label', _('Temperature Band: %s').format(label));
             return;
         }
 
@@ -330,12 +363,11 @@ return view.extend({
         state.appendChild(E('strong', {}, temp.toFixed(1) + ' °C'));
         state.appendChild(document.createTextNode(' \u00b7 ' + zone_label(zone)));
 
-        // 把整条带子翻译成一句话，读屏用户不必去理解图形
+        // 把整条带子翻译成一句话，读屏用户不必去理解图形。
+        // 用带占位符的单条 msgid 而不是拼接：语序与标点要留给译者。
         band.setAttribute('aria-label',
-            _('Temperature Band') + ': ' + temp.toFixed(1) + ' °C, ' + zone_label(zone) +
-            ', ' + _('Stop') + ' ' + geo.stop + ' °C, ' +
-            _('Start') + ' ' + cfg.start_temp + ' °C, ' +
-            _('Max') + ' ' + cfg.max_temp + ' °C');
+            _('Temperature Band: %s °C, %s, stop %s °C, start %s °C, max %s °C').format(
+                temp.toFixed(1), zone_label(zone), geo.stop, cfg.start_temp, cfg.max_temp));
     },
 
     updateStatus: function () {
@@ -356,14 +388,14 @@ return view.extend({
                 if (temp_str === false) {
                     span.className = 'fc-value fc-value-text';
                     span.textContent = _('Read failed');
-                    self.render_band_reading(cfg, 0, false);
+                    self.render_band_reading(cfg, 0, 'read-failed');
                 } else if (temp_str != null && temp_str.trim() !== '') {
                     var raw = parseInt(temp_str, 10);
 
                     if (isNaN(raw)) {
                         span.className = 'fc-value fc-value-text';
                         span.textContent = _('Invalid');
-                        self.render_band_reading(cfg, 0, false);
+                        self.render_band_reading(cfg, 0, 'invalid');
                     } else {
                         var temp = raw / cfg.temp_div;
 
@@ -371,12 +403,12 @@ return view.extend({
                         span.textContent = temp.toFixed(1);
                         span.appendChild(E('small', {}, '°C'));
                         self.flash(span);
-                        self.render_band_reading(cfg, temp, true);
+                        self.render_band_reading(cfg, temp, 'ok');
                     }
                 } else {
                     span.className = 'fc-value fc-value-text';
                     span.textContent = _('N/A');
-                    self.render_band_reading(cfg, 0, false);
+                    self.render_band_reading(cfg, 0, 'empty');
                 }
             });
         }
@@ -443,7 +475,8 @@ return view.extend({
                 paint('is-off', _('Disabled'));
         }).catch(function () {
             // 权限不足或 ubus 不可用时如实显示未知，不要退回配置开关冒充运行状态
-            paint('is-off', _('Unknown'));
+            // 「查不到」不该打扮成「没启用」：灰色留给 Disabled，状态未知按警告处理
+            paint('is-warn', _('Unknown'));
         });
     },
 
@@ -456,14 +489,19 @@ return view.extend({
             E('div', { 'class': 'fc-panel cbi-section' }, [
                 E('h3', {}, _('Live Status')),
                 E('div', { 'class': 'cbi-section-node', 'style': 'padding: 1rem;' }, [
-                    E('div', { 'class': 'fc-readouts', 'aria-live': 'polite' }, [
+                    // aria-live 不放在这里：读数每 5 秒都变，读屏会被持续打断。
+                    // 只让服务徽标播报 —— 那是低频、高价值的状态翻转。
+                    E('div', { 'class': 'fc-readouts' }, [
                         E('div', { 'class': 'fc-readout is-primary' }, [
                             E('span', { 'class': 'fc-readout-label' }, _('CPU Temperature')),
                             E('span', { 'class': 'fc-value', 'id': 'fc_temp' }, _('Loading...'))
                         ]),
                         E('div', { 'class': 'fc-readout' }, [
                             E('span', { 'class': 'fc-readout-label' }, _('Service Status')),
-                            E('span', { 'class': 'fc-badge is-off', 'id': 'fc_service' }, _('Loading...'))
+                            E('span', {
+                                'class': 'fc-badge is-off', 'id': 'fc_service',
+                                'aria-live': 'polite', 'aria-atomic': 'true'
+                            }, _('Loading...'))
                         ]),
                         E('div', { 'class': 'fc-readout' }, [
                             E('span', { 'class': 'fc-readout-label' }, _('Fan Speed Level')),
