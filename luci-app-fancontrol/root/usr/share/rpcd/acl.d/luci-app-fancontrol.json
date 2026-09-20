@@ -5,6 +5,11 @@
 			"uci": [
 				"fancontrol"
 			],
+			"ubus": {
+				"service": [
+					"list"
+				]
+			},
 			"file": {
 				"/sys/class/thermal/cooling_device*/cur_state": [
 					"read"
