@@ -132,11 +132,14 @@ var css = `
         background: currentColor;
     }
 
-    /* 取中明度，浅底深底都过得了 3:1。刻意不跟 prefers-color-scheme 走：
-       LuCI 主题的暗色是切 class，不响应系统媒体查询，跟着它走会让
-       「系统浅色 + 主题深色」的用户拿到偏暗的绿。 */
+    /* 白色底上实测：#3f9168 是 3.85:1、#b8860b 是 3.25:1、#c04a33 是 4.92:1，都过 3:1。
+       （曾经把黄换成 #c2912b，白色底只有 2.85:1，退步了，换回来。）
+       深色主题下红会掉到 3:1 以下（#2d2d2d 上 2.80:1）。这里不以颜色单独承载信息 ——
+       徽标里始终带文字，颜色只是加速辨认。
+       刻意不跟 prefers-color-scheme 走：LuCI 主题的暗色是切 class，
+       不响应系统媒体查询，跟着它走只在系统偏好碰巧一致时才生效。 */
     .fc-badge.is-ok { color: #3f9168; }
-    .fc-badge.is-warn { color: #c2912b; }
+    .fc-badge.is-warn { color: #b8860b; }
     .fc-badge.is-off { opacity: 0.55; }
     .fc-badge.is-err { color: #c04a33; }
 
@@ -343,7 +346,8 @@ return view.extend({
             var label = {
                 'read-failed': _('Read failed'),
                 'invalid': _('Invalid'),
-                'empty': _('N/A')
+                'empty': _('N/A'),
+                'no-path': _('No temperature path configured')
             }[reason] || _('Read failed');
 
             // 原因写在带子下面，而不是只塞进 title（触屏和键盘都拿不到 title）
@@ -411,6 +415,10 @@ return view.extend({
                     self.render_band_reading(cfg, 0, 'empty');
                 }
             });
+        } else {
+            // 没配温度路径：既不是「读失败」也不是「内容非法」，单独说清楚，
+            // 否则带子会永远停在初始的 Loading...
+            self.render_band_reading(cfg, 0, 'no-path');
         }
 
         if (cfg.fan_file) {
@@ -508,7 +516,11 @@ return view.extend({
                             E('span', { 'class': 'fc-value fc-value-sm', 'id': 'fc_fan' }, _('Loading...'))
                         ])
                     ]),
-                    E('div', { 'class': 'fc-band is-unknown', 'id': 'fc_band', 'role': 'img' }, [
+                    E('div', {
+                        'class': 'fc-band is-unknown', 'id': 'fc_band', 'role': 'img',
+                        // 初始也要给个名字，否则 role="img" 在没有 aria-label 时是无名图形
+                        'aria-label': _('Temperature Band: %s').format(_('Loading...'))
+                    }, [
                         E('div', { 'class': 'fc-band-label' }, _('Temperature Band')),
                         E('div', { 'class': 'fc-track', 'id': 'fc_track' }, [
                             E('span', { 'class': 'fc-marker', 'id': 'fc_marker' })

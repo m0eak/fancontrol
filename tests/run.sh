@@ -45,9 +45,12 @@ m = re.search(r"var css = `(.*?)`;", src, re.S)
 if not m:
     raise SystemExit("could not find the inline css block")
 css = m.group(1)
+# 注释既能伪造「已定义」也能伪造「被引用」，先剥掉
+css = re.sub(r"/\*.*?\*/", "", css, flags=re.S)
 defined = set(re.findall(r"(--[a-z0-9-]+)\s*:", css))
-defined |= set(re.findall(r"setProperty\('(--[a-z0-9-]+)'", src))
-used = set(re.findall(r"var\((--[a-z0-9-]+)", css))
+defined |= set(re.findall(r'setProperty\(\s*[\'"](--[a-z0-9-]+)[\'"]', src))
+# 只有 var(--x) 才算依赖：var(--x, #fff) 带 fallback，按规范合法，不算未定义
+used = set(r for r, sep in re.findall(r"var\(\s*(--[a-z0-9-]+)\s*([,)])", css, re.S) if sep == ")")
 missing = sorted(used - defined)
 if missing:
     raise SystemExit("undefined custom properties: " + ", ".join(missing))

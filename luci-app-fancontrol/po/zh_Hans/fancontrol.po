@@ -141,6 +141,9 @@ msgstr "启动"
 msgid "Stop"
 msgstr "停机"
 
+msgid "No temperature path configured"
+msgstr "未配置温度文件路径"
+
 msgid "Temperature Band: %s"
 msgstr "温度带：%s"
 
