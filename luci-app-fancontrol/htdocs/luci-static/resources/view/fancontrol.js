@@ -92,13 +92,13 @@ return view.extend({
                 var temp_span = document.getElementById('status_temp');
                 if (temp_span) {
                     if (temp_str === false) {
-                        temp_span.innerText = _('Read failed');
+                        temp_span.textContent = _('Read failed');
                         temp_span.title = _('Check that the path exists and is allowed by the ACL.');
                     } else if (temp_str != null && temp_str.trim() !== '') {
                         var temp = parseInt(temp_str, 10);
-                        temp_span.innerText = !isNaN(temp) ? (temp / temp_div).toFixed(1) + ' °C' : _('Invalid');
+                        temp_span.textContent = !isNaN(temp) ? (temp / temp_div).toFixed(1) + ' °C' : _('Invalid');
                     } else {
-                        temp_span.innerText = _('N/A');
+                        temp_span.textContent = _('N/A');
                     }
                 }
             });
@@ -109,13 +109,13 @@ return view.extend({
                 var speed_span = document.getElementById('status_speed');
                 if (speed_span) {
                     if (speed_str === false) {
-                        speed_span.innerText = _('Read failed');
+                        speed_span.textContent = _('Read failed');
                         speed_span.title = _('Check that the path exists and is allowed by the ACL.');
                     } else if (speed_str != null && speed_str.trim() !== '') {
                         var speed = parseInt(speed_str, 10);
-                        speed_span.innerText = !isNaN(speed) ? speed : _('Invalid');
+                        speed_span.textContent = !isNaN(speed) ? speed : _('Invalid');
                     } else {
-                        speed_span.innerText = _('N/A');
+                        speed_span.textContent = _('N/A');
                     }
                 }
             });
@@ -208,8 +208,17 @@ return view.extend({
             // Start polling and perform initial update *after* render completes
             this.updateStatus(thermal_file, fan_file, temp_div);
             this.pollingTimer = setInterval(L.bind(function() {
+                // 页面不可见时不发 RPC：守护进程照常控温，后台标签页没必要每 5 秒查一次 sysfs
+                if (document.hidden)
+                    return;
                 this.updateStatus(thermal_file, fan_file, temp_div);
             }, this), 5000);
+            // 切回页面时立刻补一次，不必等下一个 5 秒周期
+            this.visibilityHandler = L.bind(function() {
+                if (!document.hidden)
+                    this.updateStatus(thermal_file, fan_file, temp_div);
+            }, this);
+            document.addEventListener('visibilitychange', this.visibilityHandler);
 
             return container;
         }, this));
@@ -223,6 +232,10 @@ return view.extend({
         if (this.pollingTimer) {
             clearInterval(this.pollingTimer);
             this.pollingTimer = null;
+        }
+        if (this.visibilityHandler) {
+            document.removeEventListener('visibilitychange', this.visibilityHandler);
+            this.visibilityHandler = null;
         }
     }
 });
