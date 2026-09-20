@@ -42,7 +42,8 @@ jobs:
             fi
             echo "Source unusable, trying the next one if configured: $url"
           done
-          test -s sdk.tar.zst || { echo "SDK download failed from all sources" >&2; exit 1; }
+          # 与循环内同一标准复验：只查「非空」会放过 200 垃圾页，失败推迟到下面的解压才暴露
+          tar --zstd -tf sdk.tar.zst >/dev/null 2>&1 || { echo "SDK download failed from all sources" >&2; exit 1; }
           tar --zstd -xf sdk.tar.zst
           mv immortalwrt-sdk-* sdk
 
