@@ -13,6 +13,16 @@ var callReadFile = rpc.declare({
     expect: { data: '' }
 });
 
+// RPC: 查询 procd 里服务的真实运行状态。返回结构为
+// { <服务名>: { instances: { <实例名>: { running, pid, ... } } } }，
+// 其中 running 来自 procd 的 instance_dump()（procd/service/instance.c）
+var callServiceList = rpc.declare({
+    object: 'service',
+    method: 'list',
+    params: ['name'],
+    expect: { '': {} }
+});
+
 // 这里的CSS只负责排版布局（左右分栏），完全不涉及颜色和背景
 // 颜色和边框统统交给你的主题去决定喵！
 var css = `
@@ -122,6 +132,30 @@ return view.extend({
         }
     },
 
+    updateServiceState: function (enabled_span) {
+        if (!enabled_span)
+            return;
+
+        // 查 procd 里实例的真实运行状态，而不是 UCI 的 enabled 开关：
+        // 守护进程崩溃重启循环时配置开关仍然是 1，面板会谎报「运行中」
+        callServiceList('fancontrol').then(function (services) {
+            var instances = (services && services.fancontrol && services.fancontrol.instances) || {};
+            var running = Object.keys(instances).some(function (name) {
+                return instances[name] && instances[name].running;
+            });
+
+            // 用主题的语义类，而不是写死 color:green/red，暗色主题下才有一致的对比度
+            enabled_span.textContent = '';
+            enabled_span.appendChild(E('span', {
+                'class': 'label ' + (running ? 'success' : 'danger')
+            }, running ? _('Running') : _('Stopped')));
+        }).catch(function () {
+            // 权限不足或 ubus 不可用时如实显示未知，不要退回配置开关冒充运行状态
+            enabled_span.textContent = '';
+            enabled_span.appendChild(E('span', { 'class': 'label' }, _('Unknown')));
+        });
+    },
+
     render: function (data) {
         var m, s, o;
 
@@ -192,15 +226,7 @@ return view.extend({
         var fan_file = uci.get('fancontrol', 'settings', 'fan_file');
         // 必须用 parseInt：uci.get 返回的是字符串，"0" 在 JS 里是真值，会算出 Infinity °C
         var temp_div = parseInt(uci.get('fancontrol', 'settings', 'temp_div'), 10) || 1000;
-        var isEnabled = uci.get('fancontrol', 'settings', 'enabled') == '1';
-
-        var enabled_span = container.querySelector('#status_enabled');
-        if (enabled_span) {
-            // 用主题的语义类，而不是写死 color:green/red，暗色主题下才有一致的对比度
-            enabled_span.appendChild(E('span', {
-                'class': 'label ' + (isEnabled ? 'success' : 'danger')
-            }, isEnabled ? _('Running') : _('Stopped')));
-        }
+        this.updateServiceState(container.querySelector('#status_enabled'));
 
         return m.render().then(L.bind(function (map_rendered) {
             container.querySelector('.fan-form-container').appendChild(map_rendered);
@@ -212,11 +238,14 @@ return view.extend({
                 if (document.hidden)
                     return;
                 this.updateStatus(thermal_file, fan_file, temp_div);
+                this.updateServiceState(document.getElementById('status_enabled'));
             }, this), 5000);
             // 切回页面时立刻补一次，不必等下一个 5 秒周期
             this.visibilityHandler = L.bind(function() {
-                if (!document.hidden)
+                if (!document.hidden) {
                     this.updateStatus(thermal_file, fan_file, temp_div);
+                    this.updateServiceState(document.getElementById('status_enabled'));
+                }
             }, this);
             document.addEventListener('visibilitychange', this.visibilityHandler);
 
