@@ -197,7 +197,6 @@ return view.extend({
         var enabled_span = container.querySelector('#status_enabled');
         if (enabled_span) {
             // 用主题的语义类，而不是写死 color:green/red，暗色主题下才有一致的对比度
-            enabled_span.textContent = '';
             enabled_span.appendChild(E('span', {
                 'class': 'label ' + (isEnabled ? 'success' : 'danger')
             }, isEnabled ? _('Running') : _('Stopped')));
