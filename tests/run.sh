@@ -24,6 +24,10 @@ echo "== C regression tests (ASan + UBSan) =="
 "$build/fancontrol_test"
 
 echo
+echo "== LuCI view helpers =="
+node "$root/tests/js/fancontrol_view_test.js"
+
+echo
 echo "== LuCI view parses as JavaScript =="
 # The view uses a top-level return, which LuCI wraps in a function, so it is
 # parsed inside one here as well to reproduce LuCI's wrapping semantics.
