@@ -167,6 +167,9 @@ return view.extend({
 
         o = s.option(form.Flag, 'enabled', _('Enable Service'));
         o = s.option(form.Value, 'thermal_file', _('Thermal File Path'));
+        o = s.option(form.Value, 'temp_div', _('Temperature Divisor'));
+        o.description = _('The raw sensor value is divided by this to get degrees Celsius.');
+
         o = s.option(form.Value, 'fan_file', _('Fan Control File Path'));
 
         o = s.option(form.Value, 'start_speed', _('Initial Speed'));
