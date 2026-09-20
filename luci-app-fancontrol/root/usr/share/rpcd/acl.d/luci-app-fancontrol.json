@@ -8,6 +8,9 @@
 			"file": {
 				"/sys/devices/virtual/thermal/*/*": [
 					"read"
+				],
+				"/sys/class/thermal/*/*": [
+					"read"
 				]
 			}
 		},
