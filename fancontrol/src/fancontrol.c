@@ -155,7 +155,11 @@ int set_fanspeed(int fan_speed ,char* fan_file) {
 }  
   
 /**  
- * 计算风扇转速 (纯计算逻辑)
+ * 计算风扇转速 (纯计算逻辑)  
+ *  
+ * 守卫顺序是有意的：低温分支在前，因此配置非法（max_temp <= min_temp）且温度低于  
+ * start_temp 时会返回 min_speed。主循环只在 temperature >= start_temp 时才调用本函数，  
+ * 所以实际走到的是「配置非法 → 满速」那条分支。  
  */  
 int calculate_speed(int current_temp ,int max_temp ,int min_temp ,int max_speed ,int min_speed) {  
     if (current_temp < min_temp) return min_speed; // 防止低温时算出负数
