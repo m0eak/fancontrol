@@ -12,7 +12,11 @@ on:
   workflow_dispatch:
 
 env:
-  SDK_URL: https://immortalwrt.kyarucloud.moe/releases/25.12-SNAPSHOT/targets/qualcommax/ipq60xx/immortalwrt-sdk-25.12-SNAPSHOT-qualcommax-ipq60xx_gcc-14.3.0_musl.Linux-x86_64.tar.zst
+  # Pinned to a numbered release. 25.12-SNAPSHOT is a rolling directory that upstream
+  # prunes, which would eventually break CI with a 404 that no code change can fix.
+  SDK_URL: https://immortalwrt.kyarucloud.moe/releases/25.12.2/targets/qualcommax/ipq60xx/immortalwrt-sdk-25.12.2-qualcommax-ipq60xx_gcc-14.3.0_musl.Linux-x86_64.tar.zst
+  # The same file on the official server, used when the mirror is unreachable.
+  SDK_FALLBACK_URL: https://downloads.immortalwrt.org/releases/25.12.2/targets/qualcommax/ipq60xx/immortalwrt-sdk-25.12.2-qualcommax-ipq60xx_gcc-14.3.0_musl.Linux-x86_64.tar.zst
 
 jobs:
   build:
@@ -29,7 +33,15 @@ jobs:
 
       - name: Download and Extract SDK
         run: |
-          wget -qO- "$SDK_URL" | tar --zstd -xf -
+          for url in "$SDK_URL" "$SDK_FALLBACK_URL"; do
+            if wget -q -O sdk.tar.zst "$url"; then
+              echo "SDK downloaded from $url"
+              break
+            fi
+            echo "Download failed, trying the next source: $url"
+          done
+          test -s sdk.tar.zst
+          tar --zstd -xf sdk.tar.zst
           mv immortalwrt-sdk-* sdk
 
       - name: Prepare Feeds
@@ -61,6 +73,8 @@ jobs:
           find sdk/bin -name "fancontrol*.apk" -exec cp {} artifacts/ \;
           find sdk/bin -name "luci-app-fancontrol*.apk" -exec cp {} artifacts/ \;
           find sdk/bin -name "luci-i18n-fancontrol*.apk" -exec cp {} artifacts/ \;
+          # 没有产物就直接失败，否则会发出一个空的 Release
+          test -n "$(ls -A artifacts)"
           ls -R artifacts/
 
       - name: Generate Release Tag
