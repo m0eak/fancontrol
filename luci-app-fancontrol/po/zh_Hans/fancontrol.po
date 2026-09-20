@@ -69,20 +69,8 @@ msgstr "不可用"
 msgid "Fan General Control"
 msgstr "通用风扇控制小程序"
 
-msgid "The minimum speed level when the fan is running."
-msgstr "风扇运行时，风扇的最低速度等级。"
-
-msgid "The maximum speed level of the fan."
-msgstr "风扇的最大速度等级。"
-
-msgid "When the temperature reaches this value, the fan starts spinning."
-msgstr "当温度达到这个值时，风扇开始转动。"
-
 msgid "Max Temperature (°C)"
 msgstr "全速温度 (°C)"
-
-msgid "The temperature at which the fan should run at maximum speed."
-msgstr "当温度达到这个值时，风扇应全速运转。"
 
 msgid "Hysteresis Temperature (°C)"
 msgstr "回差温度 (°C)"
@@ -98,6 +86,36 @@ msgstr "调试日志"
 
 msgid "Log the temperature and target speed to syslog on every poll."
 msgstr "每次轮询都把温度与目标转速写入 syslog。"
+
+msgid "At this temperature the fan runs at the maximum speed level."
+msgstr "达到此温度时风扇以最大档位运行。"
+
+msgid "Device"
+msgstr "设备"
+
+msgid "Fan curve"
+msgstr "调速曲线"
+
+msgid "These five settings describe one curve: the fan stops below the start temperature minus the hysteresis, and rises linearly to the maximum level at the maximum temperature. The band at the top of this page is drawn from these values."
+msgstr "这五项共同描述一条曲线：温度低于「启动温度 − 回差温度」时风扇停转，从启动温度到最高温度之间档位线性上升到最大档位。页面顶部的温度带就是按这些值画的。"
+
+msgid "The temperature file to poll. rpcd only permits the paths listed in the README."
+msgstr "要轮询的温度文件。rpcd 只允许 README 里列出的那几种路径。"
+
+msgid "The file holding the fan speed level. Written by the daemon, read here for display only."
+msgstr "存放风扇档位的文件。由守护进程写入，这里只读取用于显示。"
+
+msgid "The fan starts, or keeps running, at or above this temperature. Must be below the maximum."
+msgstr "温度达到或高于此值时风扇启动；已在转动则继续。必须低于最高温度。"
+
+msgid "The fan stops only below (start temperature - hysteresis). Keep it smaller than the start temperature."
+msgstr "只有降到「启动温度 − 回差温度」以下才停转。请保持它小于启动温度。"
+
+msgid "The lowest level the fan uses once it is running. Should be lower than the maximum."
+msgstr "风扇转动后使用的最低档位，应低于最大档位。"
+
+msgid "The highest level, reached at the maximum temperature. Your driver has its own ceiling - check max_state on the cooling device."
+msgstr "最高档位，在最高温度时达到。驱动自身还有上限，可查看 cooling device 的 max_state。"
 
 msgid "Disabled"
 msgstr "未启用"
@@ -137,6 +155,3 @@ msgstr "读取失败"
 
 msgid "Check that the path exists and is allowed by the ACL."
 msgstr "请确认该路径存在，且在本应用允许访问的范围内。"
-
-msgid "The fan will not stop until the temperature drops below (Start Temperature - Hysteresis)."
-msgstr "只有当温度降至 (启动温度 - 回差温度) 以下时，风扇才会停止。"

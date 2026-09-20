@@ -206,6 +206,15 @@ var css = `
     .fc-band-state { margin: 2px 0 0; font-size: 13px; opacity: 0.8; }
     .fc-band-state strong { opacity: 1; }
 
+    /* 表单里的说明块（LuCI 的 DummyValue 承载） */
+    .fc-note {
+        margin: 0 0 6px;
+        font-size: 13px;
+        line-height: 1.65;
+        opacity: 0.8;
+        max-width: 60ch;
+    }
+
     @keyframes fc-flash {
         from { background: rgba(127, 127, 127, 0.22); }
         to { background: transparent; }
@@ -487,9 +496,17 @@ return view.extend({
         s = m.section(form.TypedSection, 'fancontrol', _('General'));
         s.anonymous = true;
 
-        o = s.option(form.Flag, 'enabled', _('Enable Service'));
-        o = s.option(form.Value, 'thermal_file', _('Thermal File Path'));
-        o = s.option(form.Value, 'temp_div', _('Temperature Divisor'));
+        // 分成两组：一组是「跟谁说话」（文件与开关），一组是「怎么调速」（曲线参数）。
+        // tab 是 LuCI 里做分组的惯用法，窄屏会自动收成下拉。
+        s.tab('device', _('Device'));
+        s.tab('curve', _('Fan curve'));
+
+        o = s.taboption('device', form.Flag, 'enabled', _('Enable Service'));
+
+        o = s.taboption('device', form.Value, 'thermal_file', _('Thermal File Path'));
+        o.description = _('The temperature file to poll. rpcd only permits the paths listed in the README.');
+
+        o = s.taboption('device', form.Value, 'temp_div', _('Temperature Divisor'));
         o.validate = function (section_id, value) {
             // 只接受正整数：0 会让温度换算除零，空值与非数字同样无意义。
             // 不用 datatype 是因为它对空值的处理依赖 LuCI 内部实现，显式判断更可靠
@@ -499,25 +516,35 @@ return view.extend({
         };
         o.description = _('The raw sensor value is divided by this to get degrees Celsius.');
 
-        o = s.option(form.Value, 'fan_file', _('Fan Control File Path'));
+        o = s.taboption('device', form.Value, 'fan_file', _('Fan Control File Path'));
+        o.description = _('The file holding the fan speed level. Written by the daemon, read here for display only.');
 
-        o = s.option(form.Value, 'start_speed', _('Initial Speed'));
-        o.description = _('The minimum speed level when the fan is running.');
-
-        o = s.option(form.Value, 'max_speed', _('Max Speed'));
-        o.description = _('The maximum speed level of the fan.');
-
-        o = s.option(form.Value, 'start_temp', _('Start Temperature (°C)'));
-        o.description = _('When the temperature reaches this value, the fan starts spinning.');
-
-        o = s.option(form.Value, 'max_temp', _('Max Temperature (°C)'));
-        o.description = _('The temperature at which the fan should run at maximum speed.');
-
-        o = s.option(form.Value, 'hysteresis_temp', _('Hysteresis Temperature (°C)'));
-        o.description = _('The fan will not stop until the temperature drops below (Start Temperature - Hysteresis).');
-
-        o = s.option(form.Flag, 'debug', _('Debug Logging'));
+        o = s.taboption('device', form.Flag, 'debug', _('Debug Logging'));
         o.description = _('Log the temperature and target speed to syslog on every poll.');
+
+        // 曲线参数放在一起，并在组首说明它们的关系 —— 平铺列表里看不出这是一套
+        o = s.taboption('curve', form.DummyValue, '_curve_note');
+        o.rawhtml = true;
+        o.cfgvalue = function () {
+            return E('p', { 'class': 'fc-note' },
+                _('These five settings describe one curve: the fan stops below the start temperature minus the hysteresis, and rises linearly to the maximum level at the maximum temperature. The band at the top of this page is drawn from these values.')
+            ).outerHTML;
+        };
+
+        o = s.taboption('curve', form.Value, 'start_temp', _('Start Temperature (°C)'));
+        o.description = _('The fan starts, or keeps running, at or above this temperature. Must be below the maximum.');
+
+        o = s.taboption('curve', form.Value, 'max_temp', _('Max Temperature (°C)'));
+        o.description = _('At this temperature the fan runs at the maximum speed level.');
+
+        o = s.taboption('curve', form.Value, 'hysteresis_temp', _('Hysteresis Temperature (°C)'));
+        o.description = _('The fan stops only below (start temperature - hysteresis). Keep it smaller than the start temperature.');
+
+        o = s.taboption('curve', form.Value, 'start_speed', _('Initial Speed'));
+        o.description = _('The lowest level the fan uses once it is running. Should be lower than the maximum.');
+
+        o = s.taboption('curve', form.Value, 'max_speed', _('Max Speed'));
+        o.description = _('The highest level, reached at the maximum temperature. Your driver has its own ceiling - check max_state on the cooling device.');
 
         return m.render().then(L.bind(function (map_rendered) {
             container.appendChild(map_rendered);
