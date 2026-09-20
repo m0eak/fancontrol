@@ -63,7 +63,10 @@ static int write_file(const char* path ,const char* buf ,size_t len) {
     /* 刻意不用 stdio：fopen/fwrite 会先把内容写进用户态缓冲，真实的写错误要到  
        fclose 的 flush 阶段才暴露；一旦忽略 fclose 的返回值，写失败就会被当成成功，  
        于是 last_set_speed 被更新、后续永不重试，风扇卡死在错误档位 */  
-    written = write(fd ,buf ,len);  
+    /* sysfs 单次写即完成；信号（例如 SIGTERM）可能打断 write()，EINTR 应重试而不是当成失败 */  
+    do {  
+        written = write(fd ,buf ,len);  
+    } while (written < 0 && errno == EINTR);  
     saved_errno = errno;  
     close(fd);  
     if (written != (ssize_t)len && saved_errno == 0)  
@@ -126,6 +129,11 @@ int get_temperature(char* thermal_file ,int div) {
   
 /**  
  * 读取风扇速度  
+ *  
+ * 读不到或读到垃圾值时返回 0（当作「风扇停着」），这是刻意的：主循环用  
+ * `target_speed != last_set_speed` 作为「仅在变化时写入」的判据，改成返回 -1  
+ * 会让 `0 != -1` 成立，于是在「档位未知、温度又落在回滞区间」时主动把正在转的  
+ * 风扇写成 0；返回 0 恰好抑制这次写入、什么都不做，是更安全的一侧。  
  */  
 int get_fanspeed(char* fan_file) {  
     char buf[32] = { 0 };  
