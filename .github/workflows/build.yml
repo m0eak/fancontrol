@@ -33,14 +33,16 @@ jobs:
 
       - name: Download and Extract SDK
         run: |
+          # 每个源都要验包：wget 对 HTTP 200 的错误页同样返回成功，只看退出码会让兜底形同虚设
           for url in "$SDK_URL" "$SDK_FALLBACK_URL"; do
-            if wget -q -O sdk.tar.zst "$url"; then
+            rm -f sdk.tar.zst
+            if wget -q -O sdk.tar.zst "$url" && tar --zstd -tf sdk.tar.zst >/dev/null 2>&1; then
               echo "SDK downloaded from $url"
               break
             fi
-            echo "Download failed, trying the next source: $url"
+            echo "Source unusable, trying the next one if configured: $url"
           done
-          test -s sdk.tar.zst
+          test -s sdk.tar.zst || { echo "SDK download failed from all sources" >&2; exit 1; }
           tar --zstd -xf sdk.tar.zst
           mv immortalwrt-sdk-* sdk
 
@@ -74,7 +76,7 @@ jobs:
           find sdk/bin -name "luci-app-fancontrol*.apk" -exec cp {} artifacts/ \;
           find sdk/bin -name "luci-i18n-fancontrol*.apk" -exec cp {} artifacts/ \;
           # 没有产物就直接失败，否则会发出一个空的 Release
-          test -n "$(ls -A artifacts)"
+          test -n "$(ls -A artifacts)" || { echo "No .apk artifacts were produced" >&2; exit 1; }
           ls -R artifacts/
 
       - name: Generate Release Tag
@@ -82,7 +84,9 @@ jobs:
         run: |
           DATE=$(date +'%Y.%m.%d-%H%M')
           VERSION=$(grep '^PKG_VERSION:=' fancontrol/Makefile | awk -F':=' '{print $2}' | xargs)
-          RELEASE_TAG="${DATE}-v${VERSION}"
+          # 带上 PKG_RELEASE：否则改了 release 号之后，从 tag 上看不出产物到底是哪一版
+          RELEASE=$(grep '^PKG_RELEASE:=' fancontrol/Makefile | awk -F':=' '{print $2}' | xargs)
+          RELEASE_TAG="${DATE}-v${VERSION}-r${RELEASE}"
           echo "release_tag=$RELEASE_TAG" >> $GITHUB_OUTPUT
           echo "Generated release tag: $RELEASE_TAG"
 
