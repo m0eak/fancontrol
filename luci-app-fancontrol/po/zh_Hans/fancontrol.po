@@ -99,6 +99,33 @@ msgstr "调试日志"
 msgid "Log the temperature and target speed to syslog on every poll."
 msgstr "每次轮询都把温度与目标转速写入 syslog。"
 
+msgid "Disabled"
+msgstr "未启用"
+
+msgid "Hold zone"
+msgstr "回滞区"
+
+msgid "Linear zone"
+msgstr "线性区"
+
+msgid "Max"
+msgstr "满速"
+
+msgid "Max zone"
+msgstr "满速区"
+
+msgid "Off zone"
+msgstr "停机区"
+
+msgid "Start"
+msgstr "启动"
+
+msgid "Stop"
+msgstr "停机"
+
+msgid "Temperature Band"
+msgstr "温度区间"
+
 msgid "Temperature Divisor"
 msgstr "温度除数"
 
