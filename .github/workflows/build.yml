@@ -10,13 +10,11 @@ on:
       - main
       - master
   workflow_dispatch:
-
-env:
-  # Pinned to a numbered release. 25.12-SNAPSHOT is a rolling directory that upstream
-  # prunes, which would eventually break CI with a 404 that no code change can fix.
-  SDK_URL: https://immortalwrt.kyarucloud.moe/releases/25.12.2/targets/qualcommax/ipq60xx/immortalwrt-sdk-25.12.2-qualcommax-ipq60xx_gcc-14.3.0_musl.Linux-x86_64.tar.zst
-  # The same file on the official server, used when the mirror is unreachable.
-  SDK_FALLBACK_URL: https://downloads.immortalwrt.org/releases/25.12.2/targets/qualcommax/ipq60xx/immortalwrt-sdk-25.12.2-qualcommax-ipq60xx_gcc-14.3.0_musl.Linux-x86_64.tar.zst
+    inputs:
+      sdk_version:
+        description: 'ImmortalWrt release version to build against (for example 25.12.2)'
+        required: false
+        default: '25.12.2'
 
 jobs:
   checks:
@@ -49,17 +47,37 @@ jobs:
 
       - name: Download and Extract SDK
         run: |
-          # 每个源都要验包：wget 对 HTTP 200 的错误页同样返回成功，只看退出码会让兜底形同虚设
-          for url in "$SDK_URL" "$SDK_FALLBACK_URL"; do
-            rm -f sdk.tar.zst
-            if wget -q -O sdk.tar.zst "$url" && tar --zstd -tf sdk.tar.zst >/dev/null 2>&1; then
-              echo "SDK downloaded from $url"
-              break
+          VERSION="${{ github.event.inputs.sdk_version || '25.12.2' }}"
+          TARGET="qualcommax/ipq60xx"
+          # 目录里的 SDK 文件名嵌着工具链版本（gcc-14.3.0 之类），不要自己拼；从该 release
+          # 自己的 sha256sums 里把它找出来，顺便拿到哈希用于校验下载内容是否完整。
+          for base in \
+            "https://immortalwrt.kyarucloud.moe/releases/${VERSION}/targets/${TARGET}" \
+            "https://downloads.immortalwrt.org/releases/${VERSION}/targets/${TARGET}"; do
+            rm -f sha256sums sdk.tar.zst
+            if ! wget -q -O sha256sums "$base/sha256sums"; then
+              echo "No checksum list at $base"
+              continue
             fi
-            echo "Source unusable, trying the next one if configured: $url"
+            file=$(grep -oE 'immortalwrt-sdk-[^ ]*Linux-x86_64\.tar\.zst' sha256sums | head -1)
+            want=$(grep -F "$file" sha256sums | awk '{print $1}' | head -1)
+            if [ -z "$file" ] || [ -z "$want" ]; then
+              echo "No SDK entry in the checksum list at $base"
+              continue
+            fi
+            if ! wget -q -O sdk.tar.zst "$base/$file"; then
+              echo "Download failed from $base"
+              continue
+            fi
+            # wget 对 HTTP 200 的错误页同样返回成功，只有哈希能证明拿到的是想要的文件
+            if ! echo "$want  sdk.tar.zst" | sha256sum -c -; then
+              echo "Checksum mismatch from $base"
+              continue
+            fi
+            echo "SDK $file verified, fetching from $base"
+            break
           done
-          # 与循环内同一标准复验：只查「非空」会放过 200 垃圾页，失败推迟到下面的解压才暴露
-          tar --zstd -tf sdk.tar.zst >/dev/null 2>&1 || { echo "SDK download failed from all sources" >&2; exit 1; }
+          test -s sdk.tar.zst || { echo "Could not obtain a verified SDK" >&2; exit 1; }
           tar --zstd -xf sdk.tar.zst
           mv immortalwrt-sdk-* sdk
 
