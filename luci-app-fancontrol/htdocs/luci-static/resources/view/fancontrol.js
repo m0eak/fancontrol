@@ -202,10 +202,10 @@ return view.extend({
         o = s.option(form.Flag, 'enabled', _('Enable Service'));
         o = s.option(form.Value, 'thermal_file', _('Thermal File Path'));
         o = s.option(form.Value, 'temp_div', _('Temperature Divisor'));
-        o.datatype = 'uinteger';
         o.validate = function (section_id, value) {
-            // temp_div 为 0 会让温度换算除零；守护进程已能兜底，挡在保存前更直观
-            if (parseInt(value, 10) < 1)
+            // 只接受正整数：0 会让温度换算除零，空值与非数字同样无意义。
+            // 不用 datatype 是因为它对空值的处理依赖 LuCI 内部实现，显式判断更可靠
+            if (!/^[0-9]+$/.test(value) || parseInt(value, 10) < 1)
                 return _('Must be a positive integer.');
             return true;
         };
